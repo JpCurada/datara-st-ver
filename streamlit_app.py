@@ -1,8 +1,8 @@
+# streamlit_app.py
 import streamlit as st
 import os
 import interfaces as pg
-from utils.db import get_supabase_client
-
+from utils.auth import is_authenticated, is_admin, is_scholar, get_current_user, logout
 
 st.set_page_config(
     page_title="DaTARA",
@@ -10,7 +10,6 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="collapsed"
 )
-
 
 # Use forward slashes for paths to ensure compatibility with Docker
 parent_dir = os.path.dirname(os.path.abspath(__file__))
@@ -21,9 +20,7 @@ css_path = os.path.join(parent_dir, "assets", "styles.css")
 with open(css_path) as css:
     st.markdown(f'<style>{css.read()}</style>', unsafe_allow_html=True)
 
-supabase = get_supabase_client()
-
-# Public Pages
+# Define all pages
 public_home = st.Page(page=pg.public_home_page, title='Home')
 public_applications = st.Page(page=pg.public_applications_page, title='Applications')
 public_scholar_login = st.Page(page=pg.public_scholar_login_page, title='Scholar Login')
@@ -31,39 +28,47 @@ public_admin_login = st.Page(page=pg.org_admin_login, title='Admin Login')
 
 # Admin Pages
 org_admin_dashboard = st.Page(page=pg.admin_dashboard_page, title='Admin Dashboard')
-org_applications = st.Page(page=pg.admin_applications_page, title='Appliants')
+org_applications = st.Page(page=pg.admin_applications_page, title='Applications')
 org_scholars = st.Page(page=pg.admin_scholars_page, title='Scholars')
 org_moa = st.Page(page=pg.admin_moa_page, title='MoA')
 
 # Scholar Pages
 scholar_dashboard = st.Page(page=pg.scholar_dashboard_page, title='Scholar Dashboard')
 
-# Example: Use st.user.is_logged_in for authentication status
-if supabase.auth.get_user() is None:
-    # Hide the default navigation but make pages available
-    pg = st.navigation([public_home, public_applications, public_scholar_login, 
-                        public_admin_login, org_admin_dashboard, org_applications, 
-                        org_scholars, org_moa, scholar_dashboard], position="hidden")
-   
-    # Create a top navigation bar with right alignment
+# Authentication-based navigation
+if not is_authenticated():
+    # Public navigation for non-authenticated users
+    pg_nav = st.navigation({
+        "Public": [public_home, public_applications, public_scholar_login, public_admin_login]
+    }, position="hidden")
+    
+    # Create a top navigation bar
     left_section, _, right_section = st.columns([2, 3, 3], gap='small', vertical_alignment='center')
     with right_section.container(border=True):
-        nav_cols = st.columns(3)
+        nav_cols = st.columns(4)
         with nav_cols[0]:
             st.page_link(public_home, label="DaTARA")
         with nav_cols[1]:
-            st.page_link(public_scholar_login, label="Scholar")
-        with nav_cols[2]:
             st.page_link(public_applications, label="Apply")
+        with nav_cols[2]:
+            st.page_link(public_scholar_login, label="Scholar")
+        with nav_cols[3]:
+            st.page_link(public_admin_login, label="Admin")
 
-elif supabase.auth.get_user() :
-    # Show all pages if authenticated and authorized
-    pg = st.navigation([org_admin_dashboard, org_applications, org_scholars, org_moa])
-
-    st.write(supabase.auth.get_user())
-
-    # Create a top navigation bar with right alignment
-    left_section, _, right_section = st.columns([2, 3, 3], gap='small', vertical_alignment='center')
+elif is_admin():
+    # Admin navigation
+    user = get_current_user()
+    pg_nav = st.navigation({
+        "Admin": [org_admin_dashboard, org_applications, org_scholars, org_moa]
+    })
+    
+    # Admin top navigation with user info
+    left_section, middle_section, right_section = st.columns([2, 2, 4], gap='small', vertical_alignment='center')
+    
+    with left_section:
+        st.write(f"👋 Welcome, **{user['data']['first_name']}**")
+        st.caption(f"Admin • {user['data']['partner_organizations']['display_name']}")
+    
     with right_section.container(border=True):
         nav_cols = st.columns(5)
         with nav_cols[0]:
@@ -76,22 +81,36 @@ elif supabase.auth.get_user() :
             st.page_link(org_scholars, label="Scholars")
         with nav_cols[4]:
             if st.button("Logout", type="secondary", use_container_width=True):
-                for key in list(st.session_state.keys()):
-                    if key.startswith("user_") or key in ["authenticated", "admin_user", "user_email"]:
-                        del st.session_state[key]
-                # Sign out from Supabase
-                try:
-                    supabase.auth.sign_out()
-                    st.page_link(public_home, label="Home")
-                except:
-                    pass  # Ignore errors during sign out
+                logout()
                 st.success("Logged out successfully!")
                 st.rerun()
-        
 
+elif is_scholar():
+    # Scholar navigation
+    user = get_current_user()
+    pg_nav = st.navigation({
+        "Scholar": [scholar_dashboard]
+    })
+    
+    # Scholar top navigation with user info
+    left_section, middle_section, right_section = st.columns([2, 2, 4], gap='small', vertical_alignment='center')
+    
+    with left_section:
+        application_data = user['data']['applications']
+        st.write(f"👋 Welcome, **{application_data['first_name']}**")
+        st.caption(f"Scholar • ID: {user['scholar_id']}")
+    
+    with right_section.container(border=True):
+        nav_cols = st.columns(3)
+        with nav_cols[0]:
+            st.page_link(scholar_dashboard, label="Dashboard")
+        with nav_cols[1]:
+            st.write("Profile")  # Placeholder for future profile page
+        with nav_cols[2]:
+            if st.button("Logout", type="secondary", use_container_width=True):
+                logout()
+                st.success("Logged out successfully!")
+                st.rerun()
 
-
-
-
-
-pg.run()
+# Run the navigation
+pg_nav.run()

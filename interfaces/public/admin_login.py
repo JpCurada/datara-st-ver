@@ -1,33 +1,45 @@
+# interfaces/public/admin_login.py
 import streamlit as st
-import time
-from utils.db import get_supabase_client
-
-supabase = get_supabase_client()
+from utils.auth import authenticate_user, is_authenticated, is_admin
 
 def org_admin_login():
-
-    # Check if authentication is required first
-    if "auth_required" in st.session_state and st.session_state.auth_required:
-        # Clear the flag to prevent infinite loops
-        st.session_state.pop("auth_required")
-
+    # Redirect if already authenticated as admin
+    if is_authenticated() and is_admin():
+        st.success("Already logged in as admin!")
+        return
 
     st.title("Admin Login")
 
     _, login_col, _ = st.columns([1, 3, 1])
     with login_col:
-        with st.form("login_form"):
+        with st.form("admin_login_form"):
             email = st.text_input("Email")
             password = st.text_input("Password", type="password")
-            submit = st.form_submit_button("Login")
+            submit = st.form_submit_button("Login", use_container_width=True)
 
             if submit:
-                try:
-                    response = supabase.auth.sign_in_with_password({"email": email, "password": password})
-                    st.success("Login successful")
-                    st.write(response)
-                    # Optionally, store login state in session_state
-                    st.user.is_logged_in = True
-                    st.session_state["user_email"] = email
-                except Exception as e:
-                    st.error(f"Error: {e}")
+                if not email or not password:
+                    st.error("Please fill in all fields")
+                    return
+                
+                with st.spinner("Authenticating..."):
+                    user_data = authenticate_user(email, password)
+                
+                if user_data and user_data['role'] == 'admin':
+                    st.success("Login successful!")
+                    st.rerun()
+                elif user_data and user_data['role'] == 'scholar':
+                    st.error("This is a scholar account. Please use the scholar login.")
+                else:
+                    st.error("Invalid credentials or account not found in admin records.")
+
+        st.divider()
+        st.info("💡 **Admin accounts** are created by system administrators and linked to partner organizations.")
+        
+        with st.expander("Need help?"):
+            st.write("""
+            **Admin Login Issues:**
+            - Contact your system administrator if you don't have admin credentials
+            - Admin accounts must be pre-created and linked to a partner organization
+            - If you're a scholar, use the Scholar Login instead
+            """)
