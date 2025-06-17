@@ -1,0 +1,13 @@
+[theme]
+base = "light"
+primaryColor = "#fb9943"
+
+[client]
+showSidebarNavigation = false
+
+[server]
+maxUploadSize = 50
+enableStaticServing = true
+
+[global]
+disableWidgetStateDuplicationWarning = true
