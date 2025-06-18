@@ -1,9 +1,18 @@
 # interfaces/admin/scholar_view.py
 import streamlit as st
 import pandas as pd
-from datetime import datetime
+import plotly.express as px
+from datetime import datetime, timedelta
 from utils.auth import require_auth, get_current_user
-from utils.queries import get_scholars_for_admin
+from utils.queries import (
+    get_scholars_for_admin,
+    toggle_scholar_status,
+    get_scholar_certifications_count,
+    get_scholar_employment_status,
+    get_scholar_certifications,
+    get_scholar_jobs
+)
+from utils.db import get_supabase_client
 
 
 def admin_scholars_page():
@@ -19,203 +28,392 @@ def admin_scholars_page():
     
     if not scholars:
         st.info("No scholars found for your organization yet.")
-        st.write("Scholars will appear here when:")
-        st.write("1. Applications are approved")
-        st.write("2. MoA documents are submitted and approved")
-        st.write("3. Scholar accounts are activated")
+        st.write("Scholars will appear here when applications are approved and MoA documents are processed.")
         return
     
-    # Scholar Statistics
-    st.header("Scholar Statistics")
-    
-    # Calculate stats
-    total_scholars = len(scholars)
-    active_scholars = len([s for s in scholars if s['is_active']])
-    inactive_scholars = total_scholars - active_scholars
-    
-    # Display metrics
-    col1, col2, col3 = st.columns(3)
+    # Filter Controls
+    col1, col2, col3, col4 = st.columns([2, 2, 2, 1])
     
     with col1:
-        st.metric("Total Scholars", total_scholars)
+        status_filter = st.selectbox(
+            "Filter by Status",
+            options=["All", "Active", "Inactive"]
+        )
     
     with col2:
-        st.metric("Active Scholars", active_scholars)
+        search_term = st.text_input("Search", placeholder="Name, email, or Scholar ID...")
     
     with col3:
-        st.metric("Inactive Scholars", inactive_scholars)
+        sort_by = st.selectbox(
+            "Sort by",
+            options=["Newest First", "Oldest First", "Name A-Z", "Name Z-A", "Scholar ID"]
+        )
     
-    # Search and Filter Controls
-    st.header("🔍 Search & Filter")
-    
-    search_col, filter_col, sort_col = st.columns([2, 1, 1])
-    
-    with search_col:
-        search_term = st.text_input("Search scholars", placeholder="Enter name, email, or Scholar ID...")
-    
-    with filter_col:
-        status_filter = st.selectbox("Filter by Status", ["All", "Active", "Inactive"])
-    
-    with sort_col:
-        sort_option = st.selectbox("Sort by", ["Newest First", "Oldest First", "Name A-Z", "Name Z-A"])
+    with col4:
+        if st.button("Refresh", use_container_width=True):
+            st.rerun()
     
     # Apply filters
-    filtered_scholars = scholars.copy()
+    filtered_scholars = filter_scholars(scholars, status_filter, search_term, sort_by)
+    
+    # Statistics Dashboard
+    display_scholar_statistics(filtered_scholars, scholars)
+    
+    # Scholars CRUD Table
+    st.header("Scholars Directory Table")
+    display_scholars_table(filtered_scholars)
+
+
+def filter_scholars(scholars, status_filter, search_term, sort_by):
+    """Filter and sort scholars based on criteria"""
+    filtered = scholars.copy()
     
     # Status filter
     if status_filter == "Active":
-        filtered_scholars = [s for s in filtered_scholars if s['is_active']]
+        filtered = [s for s in filtered if s['is_active']]
     elif status_filter == "Inactive":
-        filtered_scholars = [s for s in filtered_scholars if not s['is_active']]
+        filtered = [s for s in filtered if not s['is_active']]
     
     # Search filter
     if search_term:
-        search_term_lower = search_term.lower()
-        filtered_scholars = [
-            s for s in filtered_scholars 
-            if (search_term_lower in f"{s['applications']['first_name']} {s['applications']['last_name']}".lower() or
-                search_term_lower in s['applications']['email'].lower() or
-                search_term_lower in s['scholar_id'].lower())
+        search_lower = search_term.lower()
+        filtered = [
+            s for s in filtered
+            if (search_lower in f"{s['applications']['first_name']} {s['applications']['last_name']}".lower() or
+                search_lower in s['applications']['email'].lower() or
+                search_lower in s['scholar_id'].lower())
         ]
     
-    # Apply sorting
-    if sort_option == "Newest First":
-        filtered_scholars.sort(key=lambda x: x['created_at'], reverse=True)
-    elif sort_option == "Oldest First":
-        filtered_scholars.sort(key=lambda x: x['created_at'])
-    elif sort_option == "Name A-Z":
-        filtered_scholars.sort(key=lambda x: f"{x['applications']['first_name']} {x['applications']['last_name']}")
-    elif sort_option == "Name Z-A":
-        filtered_scholars.sort(key=lambda x: f"{x['applications']['first_name']} {x['applications']['last_name']}", reverse=True)
+    # Sorting
+    if sort_by == "Newest First":
+        filtered.sort(key=lambda x: x['created_at'], reverse=True)
+    elif sort_by == "Oldest First":
+        filtered.sort(key=lambda x: x['created_at'])
+    elif sort_by == "Name A-Z":
+        filtered.sort(key=lambda x: f"{x['applications']['first_name']} {x['applications']['last_name']}")
+    elif sort_by == "Name Z-A":
+        filtered.sort(key=lambda x: f"{x['applications']['first_name']} {x['applications']['last_name']}", reverse=True)
+    elif sort_by == "Scholar ID":
+        filtered.sort(key=lambda x: x['scholar_id'])
     
-    # Display Results
-    st.header(f"👥 Scholars ({len(filtered_scholars)} found)")
+    return filtered
+
+
+def display_scholar_statistics(filtered_scholars, all_scholars):
+    """Display scholar statistics and charts"""
+    st.subheader("Scholar Statistics")
     
-    if not filtered_scholars:
-        st.info("No scholars match your search criteria.")
+    # Metrics
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.metric("Total Scholars", len(all_scholars))
+    
+    with col2:
+        active_count = len([s for s in all_scholars if s['is_active']])
+        st.metric("Active Scholars", active_count)
+    
+    with col3:
+        inactive_count = len(all_scholars) - active_count
+        st.metric("Inactive Scholars", inactive_count)
+    
+    with col4:
+        # Calculate average days as scholar
+        if all_scholars:
+            avg_days = sum([
+                (datetime.now().replace(tzinfo=datetime.fromisoformat(s['created_at'].replace('Z', '+00:00')).tzinfo) - 
+                 datetime.fromisoformat(s['created_at'].replace('Z', '+00:00'))).days
+                for s in all_scholars
+            ]) / len(all_scholars)
+            st.metric("Avg. Days Active", int(avg_days))
+    
+    # Charts
+    if len(all_scholars) > 0:
+        chart_col1, chart_col2 = st.columns(2)
+        
+        with chart_col1:
+            # Scholar enrollment over time
+            df = pd.DataFrame([
+                {
+                    'created_date': s['created_at'],
+                    'scholar_id': s['scholar_id'],
+                    'country': s['applications']['country']
+                }
+                for s in all_scholars
+            ])
+            
+            df['created_date'] = pd.to_datetime(df['created_date'])
+            df['enrollment_date'] = df['created_date'].dt.date
+            daily_enrollments = df.groupby('enrollment_date').size().reset_index(name='count')
+            
+            fig_timeline = px.line(
+                daily_enrollments,
+                x='enrollment_date',
+                y='count',
+                title="Scholar Enrollment Over Time",
+                labels={'enrollment_date': 'Date', 'count': 'New Scholars'}
+            )
+            st.plotly_chart(fig_timeline, use_container_width=True)
+        
+        with chart_col2:
+            # Country distribution
+            country_counts = df['country'].value_counts().head(10)
+            fig_country = px.bar(
+                x=country_counts.values,
+                y=country_counts.index,
+                orientation='h',
+                title="Top 10 Countries by Scholar Count",
+                labels={'x': 'Number of Scholars', 'y': 'Country'}
+            )
+            st.plotly_chart(fig_country, use_container_width=True)
+
+
+def display_scholars_table(scholars):
+    """Display scholars in an interactive table with CRUD operations"""
+    if not scholars:
+        st.info("No scholars match your criteria.")
         return
     
-    # Scholars Table/Cards
-    for scholar in filtered_scholars:
-        with st.container():
-            # Create scholar card
-            col1, col2, col3, col4 = st.columns([3, 2, 2, 1])
-            
-            with col1:
-                # Scholar name and basic info
-                st.write(f"**{scholar['applications']['first_name']} {scholar['applications']['last_name']}**")
-                st.caption(f"{scholar['scholar_id']}")
-            
-            with col2:
-                # Status badge
-                status_icon = "Active" if scholar['is_active'] else "Inactive"
-                status_color = "normal" if scholar['is_active'] else "off"
-                st.write(f"Status: {status_icon}")
-                
-                # Program info
-                st.caption(f"Program: {scholar['partner_organizations']['display_name']}")
-                created_date = datetime.fromisoformat(scholar['created_at'].replace('Z', '+00:00'))
-                st.caption(f"Joined: {created_date.strftime('%Y-%m-%d')}")
-            
-            with col3:
-                st.caption("Quick Stats:")
-                st.caption("Certifications: 0")  # Placeholder
-                st.caption("Jobs: Coming soon")
-            
-            with col4:
-                # Action buttons
-                if st.button("View Profile", key=f"view_profile_{scholar['scholar_id']}", use_container_width=True):
-                    st.session_state[f"show_scholar_details_{scholar['scholar_id']}"] = True
-            
-            # Expandable scholar details
-            if st.session_state.get(f"show_scholar_details_{scholar['scholar_id']}", False):
-                with st.expander(f"Scholar Profile - {scholar['applications']['first_name']} {scholar['applications']['last_name']}", expanded=True):
-                    display_scholar_profile(scholar)
-            
-            st.divider()
-    
-    # Export functionality
-    st.divider()
-    
-    if st.button("Export to CSV", use_container_width=True):
-        # Create export data
-        export_data = []
-        for scholar in scholars:
-            export_data.append({
-                'Scholar ID': scholar['scholar_id'],
-                'First Name': scholar['applications']['first_name'],
-                'Last Name': scholar['applications']['last_name'],
-                'Email': scholar['applications']['email'],
-                'Status': 'Active' if scholar['is_active'] else 'Inactive',
-                'Country': scholar['applications']['country'],
-                'Partner Organization': scholar['partner_organizations']['display_name'],
-                'Created At': scholar['created_at']
-            })
+    # Create DataFrame for display
+    table_data = []
+    for scholar in scholars:
+        created_date = datetime.fromisoformat(scholar['created_at'].replace('Z', '+00:00'))
+        days_active = (datetime.now().replace(tzinfo=created_date.tzinfo) - created_date).days
         
-        df = pd.DataFrame(export_data)
-        csv = df.to_csv(index=False)
+        # Get additional data
+        certifications_count = get_scholar_certifications_count(scholar['scholar_id'])
+        employment_status = get_scholar_employment_status(scholar['scholar_id'])
         
-        st.download_button(
-            label="Download CSV",
-            data=csv,
-            file_name=f"scholars_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-            mime="text/csv",
-            use_container_width=True
+        table_data.append({
+            'Scholar ID': scholar['scholar_id'],
+            'Name': f"{scholar['applications']['first_name']} {scholar['applications']['last_name']}",
+            'Email': scholar['applications']['email'],
+            'Country': scholar['applications']['country'],
+            'Status': 'Active' if scholar['is_active'] else 'Inactive',
+            'Days Active': days_active,
+            'Certifications': certifications_count,
+            'Employment': employment_status,
+            'Joined': created_date.strftime('%Y-%m-%d'),
+            'Full Data': scholar  # Hidden column for operations
+        })
+    
+    df = pd.DataFrame(table_data)
+    
+    # Display table with selection
+    st.write(f"Showing {len(scholars)} scholars")
+    
+    # Use columns for table and actions
+    table_col, actions_col = st.columns([3, 1])
+    
+    with table_col:
+        # Display table (without the Full Data column)
+        display_df = df.drop(columns=['Full Data'])
+        
+        # Color code the status column
+        def highlight_status(val):
+            if val == 'Active':
+                return 'background-color: #d4edda'
+            elif val == 'Inactive':
+                return 'background-color: #f8d7da'
+            return ''
+        
+        styled_df = display_df.style.applymap(highlight_status, subset=['Status'])
+        
+        st.dataframe(
+            styled_df,
+            use_container_width=True,
+            hide_index=True,
+            height=400
         )
+    
+    with actions_col:
+        st.subheader("Actions")
+        
+        # Scholar selection
+        selected_name = st.selectbox(
+            "Select Scholar",
+            options=["None"] + [row['Name'] for _, row in df.iterrows()],
+            key="selected_scholar"
+        )
+        
+        if selected_name != "None":
+            # Find selected scholar
+            selected_row = df[df['Name'] == selected_name].iloc[0]
+            selected_scholar = selected_row['Full Data']
+            
+            # Display selected scholar info
+            st.write("**Selected:**")
+            st.write(f"Name: {selected_row['Name']}")
+            st.write(f"ID: {selected_row['Scholar ID']}")
+            st.write(f"Status: {selected_row['Status']}")
+            st.write(f"Certifications: {selected_row['Certifications']}")
+            
+            # Action buttons
+            if st.button("View Profile", use_container_width=True):
+                st.session_state[f"show_scholar_profile_{selected_scholar['scholar_id']}"] = True
+                st.rerun()
+            
+            if st.button("View Certifications", use_container_width=True):
+                st.session_state[f"show_certs_{selected_scholar['scholar_id']}"] = True
+                st.rerun()
+            
+            if selected_scholar['is_active']:
+                if st.button("Deactivate", use_container_width=True):
+                    if toggle_scholar_status(selected_scholar['scholar_id'], False):
+                        st.success("Scholar deactivated")
+                        st.rerun()
+            else:
+                if st.button("Reactivate", use_container_width=True, type="primary"):
+                    if toggle_scholar_status(selected_scholar['scholar_id'], True):
+                        st.success("Scholar reactivated")
+                        st.rerun()
+        
+        # Bulk actions
+        st.divider()
+        st.subheader("Bulk Actions")
+        
+        if st.button("Export CSV", use_container_width=True):
+            csv = df.drop(columns=['Full Data']).to_csv(index=False)
+            st.download_button(
+                label="Download CSV",
+                data=csv,
+                file_name=f"scholars_{datetime.now().strftime('%Y%m%d')}.csv",
+                mime="text/csv",
+                use_container_width=True
+            )
+        
+        if st.button("Send Bulk Email", use_container_width=True):
+            st.info("Bulk email feature coming soon")
+    
+    # Show scholar profiles if requested
+    for scholar in scholars:
+        if st.session_state.get(f"show_scholar_profile_{scholar['scholar_id']}", False):
+            with st.expander(f"Scholar Profile - {scholar['applications']['first_name']} {scholar['applications']['last_name']}", expanded=True):
+                display_scholar_profile(scholar)
+                
+                if st.button("Close Profile", key=f"close_profile_{scholar['scholar_id']}"):
+                    st.session_state[f"show_scholar_profile_{scholar['scholar_id']}"] = False
+                    st.rerun()
+        
+        if st.session_state.get(f"show_certs_{scholar['scholar_id']}", False):
+            with st.expander(f"Certifications - {scholar['applications']['first_name']} {scholar['applications']['last_name']}", expanded=True):
+                display_scholar_certifications(scholar['scholar_id'])
+                
+                if st.button("Close Certifications", key=f"close_certs_{scholar['scholar_id']}"):
+                    st.session_state[f"show_certs_{scholar['scholar_id']}"] = False
+                    st.rerun()
 
 
 def display_scholar_profile(scholar):
     """Display detailed scholar profile information"""
+    st.subheader("Scholar Profile")
     
-    # Display scholar information in a detailed format
-    st.subheader("Basic Information")
+    # Profile tabs
+    profile_tabs = st.tabs(["Basic Info", "Academic Progress", "Career Status", "Account Management"])
     
-    info_col1, info_col2 = st.columns(2)
-    
-    with info_col1:
-        st.write(f"**Full Name:** {scholar['applications']['first_name']} {scholar['applications']['last_name']}")
-        st.write(f"**Email:** {scholar['applications']['email']}")
-        st.write(f"**Scholar ID:** {scholar['scholar_id']}")
-    
-    with info_col2:
-        # Status with color coding
-        status_icon = "Active" if scholar['is_active'] else "Inactive"
-        if scholar['is_active']:
-            st.success(f"Status: {status_icon}")
-        else:
-            st.error(f"Status: {status_icon}")
+    with profile_tabs[0]:
+        col1, col2 = st.columns(2)
         
-        created_date = datetime.fromisoformat(scholar['created_at'].replace('Z', '+00:00'))
-        st.write(f"**Member Since:** {created_date.strftime('%Y-%m-%d')}")
-        st.write(f"**Country:** {scholar['applications']['country']}")
+        with col1:
+            st.write(f"**Full Name:** {scholar['applications']['first_name']} {scholar['applications']['last_name']}")
+            st.write(f"**Email:** {scholar['applications']['email']}")
+            st.write(f"**Scholar ID:** {scholar['scholar_id']}")
+            st.write(f"**Country:** {scholar['applications']['country']}")
+        
+        with col2:
+            created_date = datetime.fromisoformat(scholar['created_at'].replace('Z', '+00:00'))
+            days_active = (datetime.now().replace(tzinfo=created_date.tzinfo) - created_date).days
+            
+            status_func = st.success if scholar['is_active'] else st.error
+            status_func(f"Status: {'Active' if scholar['is_active'] else 'Inactive'}")
+            
+            st.write(f"**Joined:** {created_date.strftime('%Y-%m-%d')}")
+            st.write(f"**Days Active:** {days_active}")
+            st.write(f"**Partner Org:** {scholar['partner_organizations']['display_name']}")
     
-    # Academic progress (placeholder for future implementation)
-    st.subheader("Academic Progress")
+    with profile_tabs[1]:
+        # Academic progress
+        certifications = get_scholar_certifications(scholar['scholar_id'])
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.subheader("Certifications")
+            if certifications:
+                for cert in certifications:
+                    st.write(f"**{cert['name']}**")
+                    st.caption(f"Issued by: {cert['issuing_organization']}")
+                    st.caption(f"Date: {cert['issue_month']}/{cert['issue_year']}")
+                    st.divider()
+            else:
+                st.info("No certifications yet")
+        
+        with col2:
+            st.subheader("Learning Progress")
+            st.info("Course progress tracking coming soon")
     
-    progress_col1, progress_col2 = st.columns(2)
+    with profile_tabs[2]:
+        # Career status
+        jobs = get_scholar_jobs(scholar['scholar_id'])
+        
+        if jobs:
+            for job in jobs:
+                st.subheader("Current Employment")
+                st.write(f"**Position:** {job['job_title']}")
+                st.write(f"**Company:** {job['company']}")
+                if job.get('testimonial'):
+                    st.write("**Testimonial:**")
+                    st.info(job['testimonial'])
+        else:
+            st.info("No employment information available")
     
-    with progress_col1:
-        st.info("**Certifications**\n\nCertification tracking coming soon!")
+    with profile_tabs[3]:
+        # Account management
+        st.subheader("Account Actions")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            if scholar['is_active']:
+                if st.button("Deactivate Scholar", key=f"deactivate_profile_{scholar['scholar_id']}"):
+                    if toggle_scholar_status(scholar['scholar_id'], False):
+                        st.success("Scholar deactivated")
+                        st.rerun()
+            else:
+                if st.button("Reactivate Scholar", key=f"reactivate_profile_{scholar['scholar_id']}", type="primary"):
+                    if toggle_scholar_status(scholar['scholar_id'], True):
+                        st.success("Scholar reactivated")
+                        st.rerun()
+        
+        with col2:
+            if st.button("Send Email", key=f"email_scholar_{scholar['scholar_id']}"):
+                st.info("Email feature coming soon")
+            
+            if st.button("Reset Password", key=f"reset_pwd_{scholar['scholar_id']}"):
+                st.info("Password reset feature coming soon")
+
+
+def display_scholar_certifications(scholar_id):
+    """Display scholar's certifications in detail"""
+    certifications = get_scholar_certifications(scholar_id)
     
-    with progress_col2:
-        st.info("**Course Progress**\n\nCourse completion tracking coming soon!")
+    if not certifications:
+        st.info("No certifications found for this scholar.")
+        return
     
-    # Career information (placeholder for future implementation)
-    st.subheader("Career Development")
+    st.subheader(f"Certifications ({len(certifications)} total)")
     
-    career_col1, career_col2 = st.columns(2)
+    # Create table of certifications
+    cert_data = []
+    for cert in certifications:
+        cert_data.append({
+            'Name': cert['name'],
+            'Issuing Organization': cert['issuing_organization'],
+            'Issue Date': f"{cert['issue_month']}/{cert['issue_year']}",
+            'Expiration': f"{cert.get('expiration_month', 'N/A')}/{cert.get('expiration_year', 'N/A')}" if cert.get('expiration_month') else 'No Expiration',
+            'Credential ID': cert.get('credential_id', 'N/A'),
+            'URL': cert.get('credential_url', 'N/A')
+        })
     
-    with career_col1:
-        st.info("Feature coming soon - Track employment status and career progress")
-    
-    with career_col2:
-        st.info("Feature coming soon - Certifications and achievements")
-    
-    # Account management options
-    st.subheader("Account Management")
-    
-    # Close profile button
-    if st.button("Close Profile", key=f"close_profile_{scholar['scholar_id']}", use_container_width=True):
-        if f"show_scholar_details_{scholar['scholar_id']}" in st.session_state:
-            del st.session_state[f"show_scholar_details_{scholar['scholar_id']}"]
-        st.rerun()
+    df = pd.DataFrame(cert_data)
+    st.dataframe(df, use_container_width=True, hide_index=True)

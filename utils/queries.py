@@ -1,4 +1,3 @@
-# utils/queries.py
 import streamlit as st
 from typing import List, Dict, Any, Optional, Tuple
 from datetime import datetime, date
@@ -10,14 +9,12 @@ def check_email_in_scholars(email: str, partner_org: str) -> bool:
     """Check if email already exists as an active scholar for the given partner org"""
     supabase = get_supabase_client()
     try:
-        # Get partner org ID first
         org_response = supabase.table("partner_organizations").select("partner_org_id").eq("display_name", partner_org).execute()
         if not org_response.data:
             return False
         
         partner_org_id = org_response.data[0]["partner_org_id"]
         
-        # Check if email exists in scholars through applications
         scholar_response = supabase.table("scholars").select(
             "scholar_id, applications!inner(email)"
         ).eq("partner_org_id", partner_org_id).eq("is_active", True).execute()
@@ -36,14 +33,12 @@ def check_email_in_applications(email: str, partner_org: str) -> Optional[str]:
     """Check if email already has an application for the given partner org"""
     supabase = get_supabase_client()
     try:
-        # Get partner org ID first
         org_response = supabase.table("partner_organizations").select("partner_org_id").eq("display_name", partner_org).execute()
         if not org_response.data:
             return None
         
         partner_org_id = org_response.data[0]["partner_org_id"]
         
-        # Check existing application
         app_response = supabase.table("applications").select("status").eq("email", email).eq("partner_org_id", partner_org_id).execute()
         
         if app_response.data:
@@ -62,7 +57,7 @@ def get_active_partner_organizations() -> List[str]:
         return [org["display_name"] for org in response.data]
     except Exception as e:
         st.error(f"Error fetching partner organizations: {e}")
-        return ["DataCamp", "Coursera", "Udacity", "edX"]  # Fallback
+        return ["DataCamp", "Coursera", "Udacity", "edX"]
 
 
 def save_application_to_database(form_data: Dict[str, Any]) -> bool:
@@ -70,7 +65,6 @@ def save_application_to_database(form_data: Dict[str, Any]) -> bool:
     supabase = get_supabase_client()
     
     try:
-        # Get partner org ID
         org_response = supabase.table("partner_organizations").select("partner_org_id").eq(
             "display_name", form_data["Partner Organization & Data Privacy"]["partner_org"]
         ).execute()
@@ -81,7 +75,6 @@ def save_application_to_database(form_data: Dict[str, Any]) -> bool:
         
         partner_org_id = org_response.data[0]["partner_org_id"]
         
-        # Prepare application data
         step_data = form_data
         basic_info = step_data["Basic Information"]
         geo_details = step_data["Geographic Details"]
@@ -89,7 +82,6 @@ def save_application_to_database(form_data: Dict[str, Any]) -> bool:
         interest_details = step_data["Interest Details"]
         demo_details = step_data["Demographic and Connectivity"]
         
-        # Insert main application
         application_data = {
             "partner_org_id": partner_org_id,
             "email": step_data["Partner Organization & Data Privacy"]["email"],
@@ -149,12 +141,13 @@ def save_application_to_database(form_data: Dict[str, Any]) -> bool:
 
 
 def get_applications_for_admin(partner_org_id: str, status_filter: Optional[str] = None) -> List[Dict[str, Any]]:
-    """Get applications for admin review"""
+    """Get applications for admin review with enhanced filtering"""
     supabase = get_supabase_client()
     try:
         query = supabase.table("applications").select(
             "application_id, email, first_name, last_name, status, applied_at, "
-            "country, education_status, programming_experience, data_science_experience"
+            "country, education_status, programming_experience, data_science_experience, "
+            "state_region_province, city, institution_name"
         ).eq("partner_org_id", partner_org_id)
         
         if status_filter:
@@ -168,10 +161,9 @@ def get_applications_for_admin(partner_org_id: str, status_filter: Optional[str]
 
 
 def get_application_details(application_id: str) -> Optional[Dict[str, Any]]:
-    """Get detailed application information"""
+    """Get detailed application information with all related data"""
     supabase = get_supabase_client()
     try:
-        # Get main application data
         app_response = supabase.table("applications").select("*").eq("application_id", application_id).execute()
         
         if not app_response.data:
@@ -257,10 +249,13 @@ def get_admin_dashboard_metrics(partner_org_id: str) -> Dict[str, int]:
         # Active scholars
         active_scholars = supabase.table("scholars").select("scholar_id", count="exact").eq("partner_org_id", partner_org_id).eq("is_active", True).execute()
         
-        # MoA submissions
+        # MoA submissions for this partner org
         moa_count = supabase.table("moa_submissions").select(
             "moa_id", count="exact"
-        ).execute()  # Filter by partner org through joins if needed
+        ).in_("approved_applicant_id", [
+            app["approved_applicant_id"] for app in 
+            supabase.table("approved_applicants").select("approved_applicant_id, applications!inner(partner_org_id)").eq("applications.partner_org_id", partner_org_id).execute().data
+        ]).execute()
         
         return {
             "total_applications": total_apps.count or 0,
@@ -274,12 +269,13 @@ def get_admin_dashboard_metrics(partner_org_id: str) -> Dict[str, int]:
 
 
 def get_scholars_for_admin(partner_org_id: str) -> List[Dict[str, Any]]:
-    """Get scholars list for admin"""
+    """Get scholars list for admin with enhanced data"""
     supabase = get_supabase_client()
     try:
         response = supabase.table("scholars").select(
             "scholar_id, created_at, is_active, "
-            "applications!inner(first_name, last_name, email)"
+            "applications!inner(first_name, last_name, email, country), "
+            "partner_organizations!inner(display_name)"
         ).eq("partner_org_id", partner_org_id).order("created_at", desc=True).execute()
         
         return response.data
@@ -289,12 +285,12 @@ def get_scholars_for_admin(partner_org_id: str) -> List[Dict[str, Any]]:
 
 
 def get_moa_submissions_for_admin(partner_org_id: str) -> List[Dict[str, Any]]:
-    """Get MoA submissions for admin review"""
+    """Get MoA submissions for admin review with enhanced filtering"""
     supabase = get_supabase_client()
     try:
         response = supabase.table("moa_submissions").select(
-            "moa_id, submitted_at, status, "
-            "approved_applicants!inner(applications!inner(first_name, last_name, email, partner_org_id))"
+            "moa_id, submitted_at, status, digital_signature, "
+            "approved_applicants!inner(application_id, applications!inner(first_name, last_name, email, partner_org_id, country))"
         ).execute()
         
         # Filter by partner org
@@ -312,9 +308,10 @@ def get_moa_submissions_for_admin(partner_org_id: str) -> List[Dict[str, Any]]:
 def generate_scholar_id() -> str:
     """Generate unique scholar ID in format SCH12345678"""
     import random
+    supabase = get_supabase_client()
+    
     while True:
         scholar_id = f"SCH{random.randint(10000000, 99999999)}"
-        supabase = get_supabase_client()
         try:
             # Check if ID already exists
             existing = supabase.table("scholars").select("scholar_id").eq("scholar_id", scholar_id).execute()
@@ -322,3 +319,393 @@ def generate_scholar_id() -> str:
                 return scholar_id
         except:
             return scholar_id
+
+
+# Additional CRUD operations for enhanced functionality
+
+def update_application_status(application_id: str, new_status: str, admin_id: str, reason: str = None) -> bool:
+    """Update application status with audit trail"""
+    supabase = get_supabase_client()
+    try:
+        # Update application
+        supabase.table("applications").update({"status": new_status}).eq("application_id", application_id).execute()
+        
+        # Create review record
+        supabase.table("application_reviews").insert({
+            "application_id": application_id,
+            "admin_id": admin_id,
+            "action": new_status,
+            "action_reason": reason
+        }).execute()
+        
+        return True
+    except Exception as e:
+        st.error(f"Error updating application status: {e}")
+        return False
+
+
+def get_application_review_history(application_id: str) -> List[Dict[str, Any]]:
+    """Get review history for an application"""
+    supabase = get_supabase_client()
+    try:
+        response = supabase.table("application_reviews").select(
+            "action, action_reason, reviewed_at, "
+            "admins!inner(first_name, last_name, email)"
+        ).eq("application_id", application_id).order("reviewed_at", desc=True).execute()
+        
+        return response.data
+    except Exception as e:
+        st.error(f"Error fetching review history: {e}")
+        return []
+
+
+def search_applications(partner_org_id: str, search_query: str, filters: Dict[str, Any] = None) -> List[Dict[str, Any]]:
+    """Advanced search for applications"""
+    supabase = get_supabase_client()
+    try:
+        query = supabase.table("applications").select(
+            "application_id, email, first_name, last_name, status, applied_at, "
+            "country, education_status, programming_experience, data_science_experience"
+        ).eq("partner_org_id", partner_org_id)
+        
+        # Apply text search
+        if search_query:
+            # This is a simplified text search - in production, you might want to use full-text search
+            query = query.or_(f"first_name.ilike.%{search_query}%,last_name.ilike.%{search_query}%,email.ilike.%{search_query}%")
+        
+        # Apply filters
+        if filters:
+            for key, value in filters.items():
+                if value:
+                    query = query.eq(key, value)
+        
+        response = query.order("applied_at", desc=True).execute()
+        return response.data
+    except Exception as e:
+        st.error(f"Error searching applications: {e}")
+        return []
+
+
+def get_application_analytics(partner_org_id: str) -> Dict[str, Any]:
+    """Get analytics data for applications"""
+    supabase = get_supabase_client()
+    try:
+        # Get all applications for analytics
+        response = supabase.table("applications").select(
+            "status, applied_at, country, education_status, programming_experience, "
+            "data_science_experience, gender, weekly_time_commitment"
+        ).eq("partner_org_id", partner_org_id).execute()
+        
+        applications = response.data
+        
+        # Calculate analytics
+        analytics = {
+            "total_count": len(applications),
+            "status_breakdown": {},
+            "country_breakdown": {},
+            "education_breakdown": {},
+            "experience_breakdown": {},
+            "monthly_trends": {}
+        }
+        
+        # Status breakdown
+        for app in applications:
+            status = app.get('status', 'UNKNOWN')
+            analytics["status_breakdown"][status] = analytics["status_breakdown"].get(status, 0) + 1
+        
+        # Country breakdown
+        for app in applications:
+            country = app.get('country', 'Unknown')
+            analytics["country_breakdown"][country] = analytics["country_breakdown"].get(country, 0) + 1
+        
+        # Education breakdown
+        for app in applications:
+            education = app.get('education_status', 'Unknown')
+            analytics["education_breakdown"][education] = analytics["education_breakdown"].get(education, 0) + 1
+        
+        # Programming experience breakdown
+        for app in applications:
+            exp = app.get('programming_experience', 'Unknown')
+            analytics["experience_breakdown"][exp] = analytics["experience_breakdown"].get(exp, 0) + 1
+        
+        return analytics
+    except Exception as e:
+        st.error(f"Error fetching analytics: {e}")
+        return {}
+
+
+def bulk_update_applications(application_ids: List[str], new_status: str, admin_id: str, reason: str = None) -> bool:
+    """Bulk update multiple applications"""
+    supabase = get_supabase_client()
+    try:
+        for app_id in application_ids:
+            # Update application
+            supabase.table("applications").update({"status": new_status}).eq("application_id", app_id).execute()
+            
+            # Create review record
+            supabase.table("application_reviews").insert({
+                "application_id": app_id,
+                "admin_id": admin_id,
+                "action": new_status,
+                "action_reason": reason
+            }).execute()
+        
+        return True
+    except Exception as e:
+        st.error(f"Error bulk updating applications: {e}")
+        return False
+
+
+def get_scholar_detailed_info(scholar_id: str) -> Optional[Dict[str, Any]]:
+    """Get comprehensive scholar information"""
+    supabase = get_supabase_client()
+    try:
+        # Get scholar basic info
+        scholar_response = supabase.table("scholars").select(
+            "scholar_id, created_at, is_active, "
+            "applications!inner(first_name, last_name, email, country, birthdate), "
+            "partner_organizations!inner(display_name)"
+        ).eq("scholar_id", scholar_id).execute()
+        
+        if not scholar_response.data:
+            return None
+        
+        scholar = scholar_response.data[0]
+        
+        # Get certifications
+        cert_response = supabase.table("certifications").select("*").eq("scholar_id", scholar_id).execute()
+        scholar["certifications"] = cert_response.data
+        
+        # Get jobs
+        job_response = supabase.table("jobs").select("*").eq("scholar_id", scholar_id).execute()
+        scholar["jobs"] = job_response.data
+        
+        return scholar
+    except Exception as e:
+        st.error(f"Error fetching scholar details: {e}")
+        return None
+
+
+def create_certification(scholar_id: str, certification_data: Dict[str, Any]) -> bool:
+    """Create a new certification for a scholar"""
+    supabase = get_supabase_client()
+    try:
+        certification_data["scholar_id"] = scholar_id
+        supabase.table("certifications").insert(certification_data).execute()
+        return True
+    except Exception as e:
+        st.error(f"Error creating certification: {e}")
+        return False
+
+
+def update_certification(certification_id: str, certification_data: Dict[str, Any]) -> bool:
+    """Update an existing certification"""
+    supabase = get_supabase_client()
+    try:
+        certification_data["updated_at"] = datetime.now().isoformat()
+        supabase.table("certifications").update(certification_data).eq("certification_id", certification_id).execute()
+        return True
+    except Exception as e:
+        st.error(f"Error updating certification: {e}")
+        return False
+
+
+def delete_certification(certification_id: str) -> bool:
+    """Delete a certification"""
+    supabase = get_supabase_client()
+    try:
+        supabase.table("certifications").delete().eq("certification_id", certification_id).execute()
+        return True
+    except Exception as e:
+        st.error(f"Error deleting certification: {e}")
+        return False
+
+
+def create_job_record(scholar_id: str, job_data: Dict[str, Any]) -> bool:
+    """Create a job record for a scholar"""
+    supabase = get_supabase_client()
+    try:
+        job_data["scholar_id"] = scholar_id
+        supabase.table("jobs").insert(job_data).execute()
+        return True
+    except Exception as e:
+        st.error(f"Error creating job record: {e}")
+        return False
+
+
+def get_partner_organization_stats(partner_org_id: str) -> Dict[str, Any]:
+    """Get comprehensive statistics for a partner organization"""
+    supabase = get_supabase_client()
+    try:
+        stats = {}
+        
+        # Application stats
+        app_response = supabase.table("applications").select("status").eq("partner_org_id", partner_org_id).execute()
+        applications = app_response.data
+        
+        stats["applications"] = {
+            "total": len(applications),
+            "pending": len([a for a in applications if a["status"] == "PENDING"]),
+            "approved": len([a for a in applications if a["status"] == "APPROVED"]),
+            "rejected": len([a for a in applications if a["status"] == "REJECTED"])
+        }
+        
+        # Scholar stats
+        scholar_response = supabase.table("scholars").select("is_active, created_at").eq("partner_org_id", partner_org_id).execute()
+        scholars = scholar_response.data
+        
+        stats["scholars"] = {
+            "total": len(scholars),
+            "active": len([s for s in scholars if s["is_active"]]),
+            "inactive": len([s for s in scholars if not s["is_active"]])
+        }
+        
+        # Certification stats (through scholars)
+        if scholars:
+            scholar_ids = [s["scholar_id"] for s in scholars if "scholar_id" in s]
+            if scholar_ids:
+                cert_response = supabase.table("certifications").select("certification_id").in_("scholar_id", scholar_ids).execute()
+                stats["certifications"] = {"total": len(cert_response.data)}
+        
+        return stats
+    except Exception as e:
+        st.error(f"Error fetching organization stats: {e}")
+        return {}
+
+
+def approve_moa_submission(moa_id: str, admin_id: str = None, reason: str = None) -> bool:
+    """Approve MoA submission and create scholar account"""
+    supabase = get_supabase_client()
+    
+    try:
+        # Update MoA status
+        supabase.table("moa_submissions").update({"status": "APPROVED"}).eq("moa_id", moa_id).execute()
+        
+        # Create MoA review record if admin_id provided
+        if admin_id:
+            supabase.table("moa_reviews").insert({
+                "moa_id": moa_id,
+                "admin_id": admin_id,
+                "action": "APPROVED",
+                "action_reason": reason
+            }).execute()
+        
+        # Get MoA details to create scholar record
+        moa_response = supabase.table("moa_submissions").select(
+            "approved_applicants!inner(application_id, applications!inner(partner_org_id))"
+        ).eq("moa_id", moa_id).execute()
+        
+        if moa_response.data:
+            application_id = moa_response.data[0]['approved_applicants']['application_id']
+            partner_org_id = moa_response.data[0]['approved_applicants']['applications']['partner_org_id']
+            
+            # Generate scholar ID
+            scholar_id = generate_scholar_id()
+            
+            # Create scholar record
+            supabase.table("scholars").insert({
+                "scholar_id": scholar_id,
+                "moa_id": moa_id,
+                "application_id": application_id,
+                "partner_org_id": partner_org_id,
+                "is_active": True
+            }).execute()
+            
+            return True
+        
+        return False
+        
+    except Exception as e:
+        st.error(f"Error approving MoA: {e}")
+        return False
+
+
+def request_moa_revision(moa_id: str, admin_id: str = None, reason: str = None) -> bool:
+    """Request revision for MoA submission"""
+    supabase = get_supabase_client()
+    
+    try:
+        # Update MoA status to pending for revision
+        supabase.table("moa_submissions").update({"status": "PENDING"}).eq("moa_id", moa_id).execute()
+        
+        # Create MoA review record if admin_id provided
+        if admin_id:
+            supabase.table("moa_reviews").insert({
+                "moa_id": moa_id,
+                "admin_id": admin_id,
+                "action": "REJECTED",  # Using REJECTED for revision requests
+                "action_reason": reason or "Revision requested"
+            }).execute()
+        
+        return True
+        
+    except Exception as e:
+        st.error(f"Error requesting revision: {e}")
+        return False
+
+
+def get_moa_review_history(moa_id: str) -> List[Dict[str, Any]]:
+    """Get review history for a MoA submission"""
+    supabase = get_supabase_client()
+    
+    try:
+        response = supabase.table("moa_reviews").select(
+            "action, action_reason, reviewed_at, admins!inner(first_name, last_name)"
+        ).eq("moa_id", moa_id).order("reviewed_at", desc=True).execute()
+        
+        return response.data
+        
+    except Exception as e:
+        st.error(f"Error fetching review history: {e}")
+        return []
+
+
+def toggle_scholar_status(scholar_id: str, is_active: bool) -> bool:
+    """Toggle scholar active status"""
+    supabase = get_supabase_client()
+    try:
+        supabase.table("scholars").update({"is_active": is_active}).eq("scholar_id", scholar_id).execute()
+        return True
+    except Exception as e:
+        st.error(f"Error updating scholar status: {e}")
+        return False
+
+
+def get_scholar_certifications_count(scholar_id: str) -> int:
+    """Get count of certifications for a scholar"""
+    supabase = get_supabase_client()
+    try:
+        response = supabase.table("certifications").select("certification_id", count="exact").eq("scholar_id", scholar_id).execute()
+        return response.count or 0
+    except:
+        return 0
+
+
+def get_scholar_employment_status(scholar_id: str) -> str:
+    """Get employment status for a scholar"""
+    supabase = get_supabase_client()
+    try:
+        response = supabase.table("jobs").select("job_title").eq("scholar_id", scholar_id).eq("is_published", True).execute()
+        return "Employed" if response.data else "Seeking"
+    except:
+        return "Unknown"
+
+
+def get_scholar_certifications(scholar_id: str) -> List[Dict[str, Any]]:
+    """Get detailed certifications for a scholar"""
+    supabase = get_supabase_client()
+    try:
+        response = supabase.table("certifications").select("*").eq("scholar_id", scholar_id).order("issue_year", desc=True).execute()
+        return response.data
+    except:
+        return []
+
+
+def get_scholar_jobs(scholar_id: str) -> List[Dict[str, Any]]:
+    """Get jobs for a scholar"""
+    supabase = get_supabase_client()
+    try:
+        response = supabase.table("jobs").select("*").eq("scholar_id", scholar_id).eq("is_published", True).execute()
+        return response.data
+    except:
+        return []

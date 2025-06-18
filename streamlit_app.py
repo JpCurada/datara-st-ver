@@ -1,4 +1,4 @@
-# streamlit_app.py - Enhanced version with complete functionality
+# streamlit_app.py - Enhanced version with complete functionality and persistent auth
 import streamlit as st
 import os
 import interfaces as pg
@@ -10,12 +10,20 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
+# Initialize authentication state on startup
+from utils.auth import init_auth_state
+init_auth_state()
+
 # Load custom CSS
 parent_dir = os.path.dirname(os.path.abspath(__file__))
 css_path = os.path.join(parent_dir, "static", "styles.css")
 
-with open(css_path) as css:
-    st.markdown(f'<style>{css.read()}</style>', unsafe_allow_html=True)
+try:
+    with open(css_path) as css:
+        st.markdown(f'<style>{css.read()}</style>', unsafe_allow_html=True)
+except FileNotFoundError:
+    # Fallback if CSS file not found
+    pass
 
 # Define all pages with enhanced structure
 public_home = st.Page(page=pg.public_home_page, title='Home')
@@ -79,6 +87,13 @@ if not is_authenticated():
 elif is_admin():
     # === ADMIN NAVIGATION ===
     user = get_current_user()
+    
+    # Handle case where user data might be None after refresh
+    if not user:
+        st.error("Session expired. Please log in again.")
+        logout()
+        st.rerun()
+    
     partner_org_name = user['data']['partner_organizations']['display_name']
     admin_name = user['data']['first_name']
     
@@ -130,6 +145,13 @@ elif is_admin():
 elif is_scholar():
     # === SCHOLAR NAVIGATION ===
     user = get_current_user()
+    
+    # Handle case where user data might be None after refresh
+    if not user:
+        st.error("Session expired. Please log in again.")
+        logout()
+        st.rerun()
+    
     scholar_data = user['data']
     application_data = scholar_data['applications']
     scholar_name = application_data['first_name']
@@ -189,8 +211,11 @@ def add_footer():
     with footer_col1:
         if is_authenticated():
             user = get_current_user()
-            role = user['role'].title()
-            st.caption(f"Logged in as {role}")
+            if user:
+                role = user['role'].title()
+                st.caption(f"Logged in as {role}")
+            else:
+                st.caption("Session loading...")
     
     with footer_col2:
         st.caption("DaTARA Platform • Data Science Education for All")
@@ -208,6 +233,18 @@ try:
 except Exception as e:
     st.error(f"Navigation Error: {e}")
     st.info("Please refresh the page or contact support if the issue persists.")
+    
+    # Show debug info in expander
+    with st.expander("Debug Information"):
+        st.write(f"Error: {str(e)}")
+        st.write(f"Authenticated: {is_authenticated()}")
+        st.write(f"Admin: {is_admin()}")
+        st.write(f"Scholar: {is_scholar()}")
+        if is_authenticated():
+            user = get_current_user()
+            if user:
+                st.write(f"User role: {user.get('role')}")
+                st.write(f"User email: {user.get('email')}")
     
     # Fallback navigation
     st.subheader("Emergency Navigation")

@@ -1,8 +1,16 @@
 # interfaces/admin/moa_view.py
 import streamlit as st
+import pandas as pd
+import plotly.express as px
 from datetime import datetime
 from utils.auth import require_auth, get_current_user
-from utils.queries import get_moa_submissions_for_admin
+from utils.queries import (
+    get_moa_submissions_for_admin, 
+    approve_moa_submission, 
+    request_moa_revision, 
+    get_moa_review_history
+)
+from utils.db import get_supabase_client
 
 
 def admin_moa_page():
@@ -10,290 +18,366 @@ def admin_moa_page():
     user = get_current_user()
     partner_org_id = user['partner_org_id']
     partner_org_name = user['data']['partner_organizations']['display_name']
+    admin_id = user['data']['admin_id']
     
     st.title(f"MoA Management - {partner_org_name}")
-    
-    # Introduction and explanation
-    with st.expander("About Memorandum of Agreement (MoA)", expanded=False):
-        st.markdown("""
-        **What is a Memorandum of Agreement (MoA)?**
-        
-        The MoA is a formal agreement between approved scholarship applicants and our organization. 
-        It outlines the terms, conditions, and expectations for participation in the data science scholarship program.
-        
-        **Key Components:**
-        - Program participation requirements
-        - Learning objectives and milestones
-        - Code of conduct and community guidelines
-        - Certification and completion criteria
-        - Mutual responsibilities and commitments
-        """)
-    
-    # Overview of MoA Process
-    st.subheader("MoA Submission Process")
-    st.write("Understanding the workflow:")
-    st.write("1. Applications are approved")
-    st.write("2. Approved applicants submit their signed MoA documents")
-    st.write("3. Admin reviews and verifies MoA submissions")
-    st.write("4. Approved MoAs activate scholar accounts")
     
     # Get MoA submissions
     moa_submissions = get_moa_submissions_for_admin(partner_org_id)
     
     if not moa_submissions:
         st.info("No MoA submissions found.")
-        st.write("MoA submissions will appear here after:")
-        st.write("1. Applications are approved")
-        st.write("2. Approved applicants submit their signed MoA documents")
+        st.write("MoA submissions will appear here after applications are approved and MoA documents are submitted.")
         return
     
-    # Statistics Section
-    st.header("MoA Statistics")
+    # Filter Controls
+    col1, col2, col3, col4 = st.columns([2, 2, 2, 1])
     
-    # Calculate statistics
-    total_submissions = len(moa_submissions) if moa_submissions else 0
-    pending_submissions = len([m for m in moa_submissions if m['status'] == 'PENDING']) if moa_submissions else 0
-    approved_submissions = len([m for m in moa_submissions if m['status'] == 'APPROVED']) if moa_submissions else 0
-    
-    # Display metrics
-    metric_col1, metric_col2, metric_col3, metric_col4 = st.columns(4)
-    
-    with metric_col1:
-        st.metric("Total Submissions", total_submissions)
-    
-    with metric_col2:
-        st.metric("Pending Review", pending_submissions)
-    
-    with metric_col3:
-        st.metric("Approved", approved_submissions)
-    
-    with metric_col4:
-        if total_submissions > 0:
-            approval_rate = (approved_submissions / total_submissions) * 100
-            st.metric("Approval Rate", f"{approval_rate:.1f}%")
-        else:
-            st.metric("Approval Rate", "0%")
-    
-    # Filter and refresh controls
-    filter_col1, filter_col2, filter_col3 = st.columns([2, 2, 1])
-    
-    with filter_col1:
+    with col1:
         status_filter = st.selectbox(
             "Filter by Status",
-            options=["All", "PENDING", "APPROVED", "REJECTED"],
-            index=0
+            options=["All", "PENDING", "SUBMITTED", "APPROVED"]
         )
     
-    with filter_col2:
-        search_term = st.text_input("Search by name or email", placeholder="Enter name or email...")
+    with col2:
+        search_term = st.text_input("Search", placeholder="Name or email...")
     
-    with filter_col3:
+    with col3:
+        sort_by = st.selectbox(
+            "Sort by",
+            options=["Submitted Date (Newest)", "Submitted Date (Oldest)", "Name A-Z", "Status"]
+        )
+    
+    with col4:
         if st.button("Refresh", use_container_width=True):
             st.rerun()
     
     # Apply filters
-    filtered_submissions = moa_submissions.copy()
+    filtered_moas = filter_moa_submissions(moa_submissions, status_filter, search_term, sort_by)
+    
+    # Statistics Dashboard
+    display_moa_statistics(filtered_moas, moa_submissions)
+    
+    # MoA CRUD Table
+    st.header("MoA Submissions Table")
+    display_moa_table(filtered_moas, admin_id)
+
+
+def filter_moa_submissions(moa_submissions, status_filter, search_term, sort_by):
+    """Filter and sort MoA submissions based on criteria"""
+    filtered = moa_submissions.copy()
     
     # Status filter
     if status_filter != "All":
-        filtered_submissions = [m for m in filtered_submissions if m['status'] == status_filter]
+        filtered = [moa for moa in filtered if moa['status'] == status_filter]
     
     # Search filter
     if search_term:
-        search_term_lower = search_term.lower()
-        filtered_submissions = [
-            m for m in filtered_submissions 
-            if (search_term_lower in f"{m['approved_applicants']['applications']['first_name']} {m['approved_applicants']['applications']['last_name']}".lower() or
-                search_term_lower in m['approved_applicants']['applications']['email'].lower())
+        search_lower = search_term.lower()
+        filtered = [
+            moa for moa in filtered
+            if (search_lower in f"{moa['approved_applicants']['applications']['first_name']} {moa['approved_applicants']['applications']['last_name']}".lower() or
+                search_lower in moa['approved_applicants']['applications']['email'].lower())
         ]
     
-    # Sort by submission date (newest first)
-    filtered_submissions.sort(key=lambda x: x['submitted_at'], reverse=True)
+    # Sorting
+    if sort_by == "Submitted Date (Newest)":
+        filtered.sort(key=lambda x: x['submitted_at'], reverse=True)
+    elif sort_by == "Submitted Date (Oldest)":
+        filtered.sort(key=lambda x: x['submitted_at'])
+    elif sort_by == "Name A-Z":
+        filtered.sort(key=lambda x: f"{x['approved_applicants']['applications']['first_name']} {x['approved_applicants']['applications']['last_name']}")
+    elif sort_by == "Status":
+        filtered.sort(key=lambda x: x['status'])
     
-    # Display MoA submissions
-    st.header(f"MoA Submissions ({len(filtered_submissions)} found)")
+    return filtered
+
+
+def display_moa_statistics(filtered_moas, all_moas):
+    """Display MoA statistics and charts"""
+    st.subheader("MoA Statistics")
     
-    if not filtered_submissions:
-        st.info("No MoA submissions match your current filters.")
+    # Metrics
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.metric("Total Submissions", len(all_moas))
+    
+    with col2:
+        pending_count = len([moa for moa in all_moas if moa['status'] == 'PENDING'])
+        st.metric("Pending Review", pending_count)
+    
+    with col3:
+        submitted_count = len([moa for moa in all_moas if moa['status'] == 'SUBMITTED'])
+        st.metric("Submitted", submitted_count)
+    
+    with col4:
+        approved_count = len([moa for moa in all_moas if moa['status'] == 'APPROVED'])
+        st.metric("Approved", approved_count)
+    
+    # Charts
+    if len(all_moas) > 0:
+        chart_col1, chart_col2 = st.columns(2)
+        
+        with chart_col1:
+            # Status distribution
+            df = pd.DataFrame([
+                {
+                    'status': moa['status'],
+                    'submitted_date': moa['submitted_at']
+                }
+                for moa in all_moas
+            ])
+            
+            status_counts = df['status'].value_counts()
+            fig_status = px.pie(
+                values=status_counts.values,
+                names=status_counts.index,
+                title="MoA Status Distribution",
+                color_discrete_map={
+                    'PENDING': '#ffc107',
+                    'SUBMITTED': '#17a2b8',
+                    'APPROVED': '#28a745'
+                }
+            )
+            st.plotly_chart(fig_status, use_container_width=True)
+        
+        with chart_col2:
+            # Submissions over time
+            df['submitted_date'] = pd.to_datetime(df['submitted_date'])
+            df['submission_date'] = df['submitted_date'].dt.date
+            daily_counts = df.groupby('submission_date').size().reset_index(name='count')
+            
+            fig_timeline = px.line(
+                daily_counts,
+                x='submission_date',
+                y='count',
+                title="MoA Submissions Over Time",
+                labels={'submission_date': 'Date', 'count': 'Submissions'}
+            )
+            st.plotly_chart(fig_timeline, use_container_width=True)
+
+
+def display_moa_table(moa_submissions, admin_id):
+    """Display MoA submissions in an interactive table with CRUD operations"""
+    if not moa_submissions:
+        st.info("No MoA submissions match your criteria.")
         return
     
-    # Display each submission
-    for submission in filtered_submissions:
-        with st.container():
-            # Submission header
-            col1, col2, col3, col4 = st.columns([3, 2, 2, 1])
+    # Create DataFrame for display
+    table_data = []
+    for moa in moa_submissions:
+        applicant = moa['approved_applicants']['applications']
+        submitted_date = datetime.fromisoformat(moa['submitted_at'].replace('Z', '+00:00'))
+        
+        table_data.append({
+            'MoA ID': moa['moa_id'][:8] + '...',
+            'Name': f"{applicant['first_name']} {applicant['last_name']}",
+            'Email': applicant['email'],
+            'Country': applicant['country'],
+            'Status': moa['status'],
+            'Submitted': submitted_date.strftime('%Y-%m-%d %H:%M'),
+            'Days Ago': (datetime.now().replace(tzinfo=submitted_date.tzinfo) - submitted_date).days,
+            'Full ID': moa['moa_id']  # Hidden column for operations
+        })
+    
+    df = pd.DataFrame(table_data)
+    
+    # Display table with selection
+    st.write(f"Showing {len(moa_submissions)} MoA submissions")
+    
+    # Use columns for table and actions
+    table_col, actions_col = st.columns([3, 1])
+    
+    with table_col:
+        # Display table (without the Full ID column)
+        display_df = df.drop(columns=['Full ID'])
+        
+        # Color code the status column
+        def highlight_status(val):
+            color_map = {
+                'PENDING': 'background-color: #fff3cd',
+                'SUBMITTED': 'background-color: #d1ecf1', 
+                'APPROVED': 'background-color: #d4edda'
+            }
+            return color_map.get(val, '')
+        
+        styled_df = display_df.style.applymap(highlight_status, subset=['Status'])
+        
+        st.dataframe(
+            styled_df,
+            use_container_width=True,
+            hide_index=True,
+            height=400
+        )
+    
+    with actions_col:
+        st.subheader("Actions")
+        
+        # MoA selection
+        selected_name = st.selectbox(
+            "Select MoA Submission",
+            options=["None"] + [row['Name'] for _, row in df.iterrows()],
+            key="selected_moa"
+        )
+        
+        if selected_name != "None":
+            # Find selected MoA
+            selected_row = df[df['Name'] == selected_name].iloc[0]
+            selected_id = selected_row['Full ID']
+            
+            # Display selected MoA info
+            st.write("**Selected:**")
+            st.write(f"Name: {selected_row['Name']}")
+            st.write(f"Email: {selected_row['Email']}")
+            st.write(f"Status: {selected_row['Status']}")
+            st.write(f"Submitted: {selected_row['Submitted']}")
+            
+            # Action buttons
+            if st.button("View Details", use_container_width=True):
+                st.session_state[f"show_moa_details_{selected_id}"] = True
+                st.rerun()
+            
+            if selected_row['Status'] in ['PENDING', 'SUBMITTED']:
+                if st.button("Quick Approve", use_container_width=True, type="primary"):
+                    if approve_moa_submission(selected_id, admin_id):
+                        st.success("MoA approved!")
+                        st.rerun()
+                
+                if st.button("Request Revision", use_container_width=True):
+                    if request_moa_revision(selected_id, admin_id, "Revision requested via table"):
+                        st.success("Revision requested!")
+                        st.rerun()
+        
+        # Bulk actions
+        st.divider()
+        st.subheader("Bulk Actions")
+        
+        if st.button("Export CSV", use_container_width=True):
+            csv = df.drop(columns=['Full ID']).to_csv(index=False)
+            st.download_button(
+                label="Download CSV",
+                data=csv,
+                file_name=f"moa_submissions_{datetime.now().strftime('%Y%m%d')}.csv",
+                mime="text/csv",
+                use_container_width=True
+            )
+    
+    # Show MoA details if requested
+    for moa in moa_submissions:
+        if st.session_state.get(f"show_moa_details_{moa['moa_id']}", False):
+            with st.expander(f"MoA Details - {moa['approved_applicants']['applications']['first_name']} {moa['approved_applicants']['applications']['last_name']}", expanded=True):
+                display_moa_details(moa, admin_id)
+                
+                if st.button("Close Details", key=f"close_moa_{moa['moa_id']}"):
+                    st.session_state[f"show_moa_details_{moa['moa_id']}"] = False
+                    st.rerun()
+
+
+def display_moa_details(moa, admin_id):
+    """Display detailed MoA information with review options"""
+    moa_id = moa['moa_id']
+    applicant = moa['approved_applicants']['applications']
+    
+    # MoA details in tabs
+    detail_tabs = st.tabs(["Applicant Info", "MoA Document", "Review History", "Actions"])
+    
+    with detail_tabs[0]:
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.write(f"**Name:** {applicant['first_name']} {applicant['last_name']}")
+            st.write(f"**Email:** {applicant['email']}")
+            st.write(f"**Country:** {applicant['country']}")
+            st.write(f"**Application ID:** {applicant['application_id']}")
+        
+        with col2:
+            submitted_date = datetime.fromisoformat(moa['submitted_at'].replace('Z', '+00:00'))
+            st.write(f"**Submitted:** {submitted_date.strftime('%Y-%m-%d %H:%M')}")
+            st.write(f"**Status:** {moa['status']}")
+            st.write(f"**Days Ago:** {(datetime.now().replace(tzinfo=submitted_date.tzinfo) - submitted_date).days}")
+    
+    with detail_tabs[1]:
+        st.subheader("Digital Signature")
+        st.code(moa['digital_signature'], language=None)
+        
+        # Verification checklist
+        st.subheader("Verification Checklist")
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.checkbox("Document properly signed", key=f"check_signed_{moa_id}")
+            st.checkbox("All fields completed", key=f"check_complete_{moa_id}")
+            st.checkbox("Signature matches name", key=f"check_signature_{moa_id}")
+        
+        with col2:
+            st.checkbox("Terms acknowledged", key=f"check_terms_{moa_id}")
+            st.checkbox("Requirements understood", key=f"check_requirements_{moa_id}")
+            st.checkbox("Contact info verified", key=f"check_contact_{moa_id}")
+    
+    with detail_tabs[2]:
+        # Get review history
+        review_history = get_moa_review_history(moa_id)
+        
+        if review_history:
+            for review in review_history:
+                review_date = datetime.fromisoformat(review['reviewed_at'].replace('Z', '+00:00'))
+                st.write(f"**{review['action']}** on {review_date.strftime('%Y-%m-%d %H:%M')}")
+                if review.get('action_reason'):
+                    st.write(f"Reason: {review['action_reason']}")
+                st.divider()
+        else:
+            st.info("No review history available.")
+    
+    with detail_tabs[3]:
+        if moa['status'] in ['PENDING', 'SUBMITTED']:
+            col1, col2, col3 = st.columns(3)
             
             with col1:
-                applicant_name = f"{submission['approved_applicants']['applications']['first_name']} {submission['approved_applicants']['applications']['last_name']}"
-                st.write(f"**{applicant_name}**")
-                st.caption(f"{submission['approved_applicants']['applications']['email']}")
+                approval_reason = st.text_area(
+                    "Approval notes (optional)",
+                    key=f"approve_notes_{moa_id}",
+                    height=100
+                )
+                
+                if st.button("Approve MoA", key=f"approve_moa_{moa_id}", type="primary", use_container_width=True):
+                    if approve_moa_submission(moa_id, admin_id, approval_reason):
+                        st.success("MoA approved successfully!")
+                        st.balloons()
+                        if f"show_moa_details_{moa_id}" in st.session_state:
+                            del st.session_state[f"show_moa_details_{moa_id}"]
+                        st.rerun()
+                    else:
+                        st.error("Failed to approve MoA.")
             
             with col2:
-                # Status badge
-                status_colors = {
-                    'PENDING': 'Orange',
-                    'APPROVED': 'Green'
-                }
-                status_color = status_colors.get(submission['status'], 'Gray')
-                st.write(f"Status: {status_color} {submission['status']}")
+                revision_reason = st.text_area(
+                    "Revision request reason",
+                    key=f"revision_reason_{moa_id}",
+                    height=100,
+                    placeholder="Specify what needs correction..."
+                )
+                
+                if st.button("Request Revision", key=f"revise_moa_{moa_id}", use_container_width=True):
+                    if not revision_reason.strip():
+                        st.warning("Please provide a reason for revision.")
+                    else:
+                        if request_moa_revision(moa_id, admin_id, revision_reason):
+                            st.success("Revision request sent.")
+                            if f"show_moa_details_{moa_id}" in st.session_state:
+                                del st.session_state[f"show_moa_details_{moa_id}"]
+                            st.rerun()
+                        else:
+                            st.error("Failed to request revision.")
             
             with col3:
-                # Submission date
-                submitted_date = datetime.fromisoformat(submission['submitted_at'].replace('Z', '+00:00'))
-                st.write(f"{submitted_date.strftime('%Y-%m-%d %H:%M')}")
+                st.write("**Quick Actions:**")
+                if st.button("Download MoA", use_container_width=True):
+                    st.info("MoA download feature coming soon.")
                 
-                # Time ago calculation
-                now = datetime.now().replace(tzinfo=submitted_date.tzinfo)
-                days_ago = (now - submitted_date).days
-                
-                if days_ago == 0:
-                    st.caption("Today")
-                elif days_ago == 1:
-                    st.caption("Yesterday")
-                else:
-                    st.caption(f"{days_ago} days ago")
-            
-            with col4:
-                if st.button("Review", key=f"review_{submission['moa_id']}", use_container_width=True):
-                    st.session_state[f"show_moa_review_{submission['moa_id']}"] = True
-            
-            # Expandable MoA details
-            if st.session_state.get(f"show_moa_review_{submission['moa_id']}", False):
-                with st.expander(f"MoA Review - {applicant_name}", expanded=True):
-                    display_moa_details(submission)
-            
-            st.divider()
-
-
-def display_moa_details(submission):
-    """Display detailed MoA information for review"""
-    
-    moa_id = submission['moa_id']
-    applicant = submission['approved_applicants']['applications']
-    
-    # Applicant Information
-    st.subheader("Applicant Information")
-    
-    applicant_col1, applicant_col2 = st.columns(2)
-    
-    with applicant_col1:
-        st.write(f"**Name:** {applicant['first_name']} {applicant['last_name']}")
-        st.write(f"**Email:** {applicant['email']}")
-        st.write(f"**Country:** {applicant['country']}")
-    
-    with applicant_col2:
-        submitted_date = datetime.fromisoformat(submission['submitted_at'].replace('Z', '+00:00'))
-        st.write(f"**Submitted:** {submitted_date.strftime('%Y-%m-%d %H:%M')}")
-        st.write(f"**Status:** {submission['status']}")
-        st.write(f"**Application ID:** {applicant['application_id']}")
-    
-    # MoA Document Review
-    st.subheader("MoA Document")
-    
-    # Digital Signature Display
-    st.write("**Digital Signature:**")
-    st.code(submission['digital_signature'], language=None)
-    
-    # Verification checklist
-    st.subheader("Verification Checklist")
-    
-    checklist_col1, checklist_col2 = st.columns(2)
-    
-    with checklist_col1:
-        st.write("**Document Requirements:**")
-        st.checkbox("Document is properly signed", key=f"check_signed_{moa_id}")
-        st.checkbox("All fields are completed", key=f"check_complete_{moa_id}")
-        st.checkbox("Signature matches applicant name", key=f"check_signature_{moa_id}")
-    
-    with checklist_col2:
-        st.write("**Content Verification:**")
-        st.checkbox("Terms and conditions acknowledged", key=f"check_terms_{moa_id}")
-        st.checkbox("Program requirements understood", key=f"check_requirements_{moa_id}")
-        st.checkbox("Contact information verified", key=f"check_contact_{moa_id}")
-    
-    # Review Actions
-    st.subheader("Review Actions")
-    
-    action_col1, action_col2, action_col3 = st.columns(3)
-    
-    with action_col1:
-        if st.button(
-            "Approve MoA",
-            key=f"approve_moa_{moa_id}",
-            type="primary",
-            use_container_width=True,
-            help="Approve this MoA and activate scholar account"
-        ):
-            # Approve the MoA
-            if approve_moa_submission(moa_id):
-                st.success("MoA approved successfully! Scholar account will be activated.")
-                st.balloons()
-                # Remove from session state to close the review
-                if f"show_moa_review_{moa_id}" in st.session_state:
-                    del st.session_state[f"show_moa_review_{moa_id}"]
-                st.rerun()
-            else:
-                st.error("Failed to approve MoA.")
-    
-    with action_col2:
-        if st.button("Request Revision", key=f"revise_moa_{moa_id}", use_container_width=True):
-            # Request revision logic here
-            revision_reason = st.text_area(
-                "Reason for revision request:",
-                key=f"revision_reason_{moa_id}",
-                placeholder="Please specify what needs to be corrected..."
-            )
-            
-            if revision_reason and st.button("Send Revision Request", key=f"send_revision_{moa_id}"):
-                # Here you would implement the revision request logic
-                st.info("Revision request sent to applicant.")
-                if f"show_moa_review_{moa_id}" in st.session_state:
-                    del st.session_state[f"show_moa_review_{moa_id}"]
-                st.rerun()
-    
-    with action_col3:
-        if st.button("Close Review", key=f"close_moa_{moa_id}", use_container_width=True):
-            if f"show_moa_review_{moa_id}" in st.session_state:
-                del st.session_state[f"show_moa_review_{moa_id}"]
-            st.rerun()
-
-
-def approve_moa_submission(moa_id: str) -> bool:
-    """Approve MoA submission and activate scholar account"""
-    from utils.db import get_supabase_client
-    from utils.queries import generate_scholar_id
-    
-    supabase = get_supabase_client()
-    
-    try:
-        # Update MoA status to approved
-        supabase.table("moa_submissions").update({"status": "APPROVED"}).eq("moa_id", moa_id).execute()
-        
-        # Get MoA details to create scholar record
-        moa_response = supabase.table("moa_submissions").select(
-            "approved_applicants!inner(application_id, applications!inner(partner_org_id))"
-        ).eq("moa_id", moa_id).execute()
-        
-        if moa_response.data:
-            application_id = moa_response.data[0]['approved_applicants']['application_id']
-            partner_org_id = moa_response.data[0]['approved_applicants']['applications']['partner_org_id']
-            
-            # Generate scholar ID
-            scholar_id = generate_scholar_id()
-            
-            # Create scholar record
-            supabase.table("scholars").insert({
-                "scholar_id": scholar_id,
-                "moa_id": moa_id,
-                "application_id": application_id,
-                "partner_org_id": partner_org_id,
-                "is_active": True
-            }).execute()
-            
-            return True
-        
-        return False
-        
-    except Exception as e:
-        st.error(f"Error approving MoA: {e}")
-        return False
+                if st.button("Contact Applicant", use_container_width=True):
+                    st.info("Email integration coming soon.")
+        else:
+            status_colors = {'APPROVED': 'success', 'REJECTED': 'error'}
+            status_func = getattr(st, status_colors.get(moa['status'], 'info'))
+            status_func(f"Status: {moa['status']}")
