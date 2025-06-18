@@ -2,7 +2,9 @@ import streamlit as st
 from typing import List, Dict, Any, Optional, Tuple
 from datetime import datetime, date
 import uuid
+import random
 from utils.db import get_supabase_client
+from services.email_service import send_approval_email
 
 
 def check_email_in_scholars(email: str, partner_org: str) -> bool:
@@ -164,12 +166,14 @@ def get_application_details(application_id: str) -> Optional[Dict[str, Any]]:
     """Get detailed application information with all related data"""
     supabase = get_supabase_client()
     try:
-        app_response = supabase.table("applications").select("*").eq("application_id", application_id).execute()
+        response = supabase.table("applications").select(
+            "*, partner_organizations!inner(display_name)"  # Add this line to include partner org data
+        ).eq("application_id", application_id).execute()
         
-        if not app_response.data:
+        if not response.data:
             return None
         
-        application = app_response.data[0]
+        application = response.data[0]
         
         # Get demographics
         demo_response = supabase.table("application_demographics").select("demographic_group").eq("application_id", application_id).execute()
@@ -193,6 +197,12 @@ def approve_application(application_id: str, admin_id: str, reason: Optional[str
     """Approve an application and create approved applicant record"""
     supabase = get_supabase_client()
     try:
+        # Get application details first
+        app_details = get_application_details(application_id)
+        if not app_details:
+            st.error("Application not found")
+            return False
+        
         # Update application status
         supabase.table("applications").update({"status": "APPROVED"}).eq("application_id", application_id).execute()
         
@@ -209,7 +219,28 @@ def approve_application(application_id: str, admin_id: str, reason: Optional[str
             "application_id": application_id
         }).execute()
         
+        # Generate scholar ID
+        scholar_id = generate_scholar_id()
+        
+        # Send approval email
+        applicant_name = f"{app_details['first_name']} {app_details['last_name']}"
+        partner_org = app_details['partner_organizations']['display_name']
+        
+        email_sent = send_approval_email(
+            email=app_details['email'],
+            applicant_name=applicant_name,
+            partner_org=partner_org,
+            scholar_id=scholar_id,
+            birthdate=str(app_details['birthdate'])
+        )
+        
+        if email_sent:
+            st.success(f"Application approved and email sent to {app_details['email']}")
+        else:
+            st.warning("Application approved but email failed to send")
+        
         return True
+        
     except Exception as e:
         st.error(f"Error approving application: {e}")
         return False
@@ -307,7 +338,6 @@ def get_moa_submissions_for_admin(partner_org_id: str) -> List[Dict[str, Any]]:
 
 def generate_scholar_id() -> str:
     """Generate unique scholar ID in format SCH12345678"""
-    import random
     supabase = get_supabase_client()
     
     while True:

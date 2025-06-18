@@ -5,8 +5,9 @@ import re
 import random
 import time
 
-from utils.applications import get_countries, get_provinces, get_universities_by_country, send_otp_email
+from utils.applications import get_countries, get_provinces, get_universities_by_country
 from utils.queries import check_email_in_scholars, check_email_in_applications, get_active_partner_organizations, save_application_to_database
+from services.email_service import send_otp_email
 
 @st.fragment
 def public_applications_page():
@@ -296,7 +297,7 @@ def public_applications_page():
                 ds_exp_index = ds_exp_options.index(data.get("data_science_experience")) if data.get("data_science_experience") in ds_exp_options else None
                 ds_exp = st.selectbox("Data Science Experience Level *", ds_exp_options, index=ds_exp_index, key="data_science_experience")
             
-            time_commitment_options = ["1-2 hours", "3-5 hours", "6-10 hours", "11-15 hours", "16+ hours"]
+            time_commitment_options = ["1-2", "3-5", "6-10", "11-15", "16+"]
             time_commitment_index = time_commitment_options.index(data.get("time_commitment")) if data.get("time_commitment") in time_commitment_options else None
             time_commitment = st.selectbox("Weekly Time Commitment *", time_commitment_options, index=time_commitment_index, key="time_commitment")
             
@@ -342,7 +343,7 @@ def public_applications_page():
             demographic_options = ["UNEMPLOYED", "UNDEREMPLOYED", "BELOW_POVERTY", "REFUGEE", "DISABLED", "STUDENT", "WORKING_STUDENT", "NONPROFIT_SCIENTIST"]
             demographic = st.multiselect("Demographic Group *", demographic_options, default=data.get("demographic", []), key="demographic")
             
-            device_options = ["SMARTPHONE", "TABLET", "LAPTOP", "DESKTOP"]
+            device_options = ["SMARTPHONE", "LAPTOP", "DESKTOP"]
             devices = st.multiselect("Devices *", device_options, default=data.get("devices", []), key="devices")
             
             connectivity_options = ["MOBILE_DATA", "WIFI"]
@@ -406,9 +407,14 @@ def public_applications_page():
                 st.rerun()
                 
             if submit_clicked:
+                # Get applicant name for email
+                applicant_name = st.session_state.form_data["Basic Information"]["first_name"]
+                
                 # Generate and send OTP
                 otp = str(random.randint(100000, 999999))
-                if send_otp_email(email, otp):
+                st.session_state.sent_otp = otp
+                
+                if send_otp_email(email, otp, applicant_name):
                     st.session_state.otp_step = True
                     st.session_state.otp_attempts = 0
                     st.success(f"A 6-digit OTP has been sent to {email}. Please check your email.")
@@ -427,7 +433,18 @@ def public_applications_page():
                 verify_clicked = st.button("Verify OTP", key="verify_otp", use_container_width=True)
             
             if verify_clicked:
-                if entered_otp == str(st.session_state.get("sent_otp", "")):
+                stored_otp = st.session_state.get("sent_otp", "")
+                
+                # Debug information (remove in production)
+                st.write(f"Debug - Entered OTP: '{entered_otp}'")
+                st.write(f"Debug - Stored OTP: '{stored_otp}'")
+                st.write(f"Debug - OTP Type: {type(stored_otp)}")
+                
+                # Ensure both are strings and strip whitespace
+                entered_clean = str(entered_otp).strip()
+                stored_clean = str(stored_otp).strip()
+                
+                if entered_clean == stored_clean and stored_clean:
                     st.session_state.otp_verified = True
                     
                     # Save application to database
@@ -452,4 +469,10 @@ def public_applications_page():
                                 del st.session_state[key]
                             st.rerun()
                     else:
-                        st.error(f"Invalid OTP. {3 - st.session_state.otp_attempts} attempts remaining.")
+                        remaining = 3 - st.session_state.otp_attempts
+                        st.error(f"Invalid OTP. {remaining} attempts remaining.")
+                        # Show what was compared for debugging
+                        if stored_clean:
+                            st.error(f"Expected: {stored_clean}, Got: {entered_clean}")
+                        else:
+                            st.error("No OTP found in session. Please request a new OTP.")

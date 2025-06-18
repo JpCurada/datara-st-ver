@@ -4,11 +4,8 @@ import smtplib
 import ssl
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from email.mime.base import MIMEBase
-from email import encoders
-import requests
 import os
-from typing import Optional, Dict, Any, List
+from typing import Optional
 from datetime import datetime
 import logging
 
@@ -18,41 +15,21 @@ logger = logging.getLogger(__name__)
 
 
 class EmailService:
-    """
-    Comprehensive email service supporting multiple providers:
-    1. Gmail SMTP
-    2. AWS SES (Simple Email Service)
-    3. Mailgun API
-    """
+    """Gmail SMTP email service"""
     
     def __init__(self):
-        self.provider = os.getenv("EMAIL_PROVIDER", "gmail")  # Default to Gmail
-        self.setup_provider()
+        self.smtp_server = st.secrets.email["smtp_server"]  # "smtp.gmail.com"
+        self.smtp_port = st.secrets.email["smtp_port"]      # 587
+        self.sender_email = st.secrets.email["sender_email"]
+        self.sender_password = st.secrets.email["sender_password"]
     
-    def setup_provider(self):
-        """Setup email provider based on environment configuration"""
-        if self.provider == "gmail":
-            self.smtp_server = "smtp.gmail.com"
-            self.smtp_port = 587
-            self.username = os.getenv("GMAIL_USERNAME")
-            self.password = os.getenv("GMAIL_APP_PASSWORD")  # App-specific password
-                        
-        elif self.provider == "aws_ses":
-            self.aws_access_key = os.getenv("AWS_ACCESS_KEY_ID")
-            self.aws_secret_key = os.getenv("AWS_SECRET_ACCESS_KEY")
-            self.aws_region = os.getenv("AWS_REGION", "us-east-1")
-            
-        elif self.provider == "mailgun":
-            self.api_key = os.getenv("MAILGUN_API_KEY")
-            self.domain = os.getenv("MAILGUN_DOMAIN")
-    
-    def send_email_smtp(self, to_email: str, subject: str, html_content: str, text_content: str = None) -> bool:
-        """Send email using SMTP (Gmail, Outlook, etc.)"""
+    def send_email(self, to_email: str, subject: str, html_content: str, text_content: str = None) -> bool:
+        """Send email using Gmail SMTP"""
         try:
             # Create message
             message = MIMEMultipart("alternative")
             message["Subject"] = subject
-            message["From"] = self.username
+            message["From"] = self.sender_email
             message["To"] = to_email
             
             # Add text and HTML parts
@@ -67,51 +44,15 @@ class EmailService:
             context = ssl.create_default_context()
             with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
                 server.starttls(context=context)
-                server.login(self.username, self.password)
+                server.login(self.sender_email, self.sender_password)
                 text = message.as_string()
-                server.sendmail(self.username, to_email, text)
+                server.sendmail(self.sender_email, to_email, text)
             
-            logger.info(f"Email sent successfully to {to_email} via SMTP")
+            logger.info(f"Email sent successfully to {to_email}")
             return True
             
         except Exception as e:
-            logger.error(f"Failed to send email via SMTP: {str(e)}")
-            return False
-    
-    def send_email_mailgun(self, to_email: str, subject: str, html_content: str, text_content: str = None) -> bool:
-        """Send email using Mailgun API"""
-        try:
-            response = requests.post(
-                f"https://api.mailgun.net/v3/{self.domain}/messages",
-                auth=("api", self.api_key),
-                data={
-                    "from": f"DaTARA Platform <noreply@{self.domain}>",
-                    "to": [to_email],
-                    "subject": subject,
-                    "text": text_content or "",
-                    "html": html_content
-                }
-            )
-            
-            if response.status_code == 200:
-                logger.info(f"Email sent successfully to {to_email} via Mailgun")
-                return True
-            else:
-                logger.error(f"Mailgun API error: {response.status_code}")
-                return False
-                
-        except Exception as e:
-            logger.error(f"Failed to send email via Mailgun: {str(e)}")
-            return False
-    
-    def send_email(self, to_email: str, subject: str, html_content: str, text_content: str = None) -> bool:
-        """Main method to send email using configured provider"""
-        if self.provider == "gmail":
-            return self.send_email_smtp(to_email, subject, html_content, text_content)
-        elif self.provider == "mailgun":
-            return self.send_email_mailgun(to_email, subject, html_content, text_content)
-        else:
-            logger.error(f"Unsupported email provider: {self.provider}")
+            logger.error(f"Failed to send email: {str(e)}")
             return False
 
 
@@ -239,7 +180,7 @@ class EmailTemplates:
         """
     
     @staticmethod
-    def otp_verification_email(otp_code: str, applicant_name: str) -> tuple[str, str]:
+    def otp_verification_email(otp_code: str, applicant_name: str) -> tuple[str, str, str]:
         """Email template for OTP verification"""
         subject = "Verify Your DaTARA Application - OTP Code"
         
@@ -289,7 +230,7 @@ class EmailTemplates:
     
     @staticmethod
     def application_approval_email(applicant_name: str, partner_org: str, scholar_id: str, 
-                                 email: str, birthdate: str, login_url: str) -> tuple[str, str]:
+                                 email: str, birthdate: str, login_url: str) -> tuple[str, str, str]:
         """Email template for application approval with scholar credentials"""
         subject = f"Congratulations! Your {partner_org} Application is APPROVED"
         
@@ -377,7 +318,7 @@ class EmailTemplates:
     
     @staticmethod
     def scholar_activation_email(scholar_name: str, partner_org: str, scholar_id: str, 
-                               platform_url: str) -> tuple[str, str]:
+                               platform_url: str) -> tuple[str, str, str]:
         """Email template for final scholar activation after MoA approval"""
         subject = f"Welcome to {partner_org}! You're Now an Active Scholar"
         
@@ -504,7 +445,7 @@ def send_approval_email(email: str, applicant_name: str, partner_org: str,
     """Send application approval email with scholar credentials"""
     try:
         email_service = EmailService()
-        login_url = os.getenv("PLATFORM_URL", "https://your-datara-platform.streamlit.app")
+        login_url = st.secrets.general["platform_url"]
         
         subject, html_content, text_content = EmailTemplates.application_approval_email(
             applicant_name, partner_org, scholar_id, email, birthdate, login_url

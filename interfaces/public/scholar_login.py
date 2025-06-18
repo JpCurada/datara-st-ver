@@ -1,6 +1,7 @@
 # interfaces/public/scholar_login.py
 import streamlit as st
 from utils.auth import scholar_login_auth, is_authenticated, is_scholar
+from datetime import date
 
 def public_scholar_login_page():
     # Redirect if already authenticated as scholar
@@ -24,10 +25,14 @@ def public_scholar_login_page():
                 placeholder="your.email@example.com",
                 help="The email address you used in your application"
             )
+
+            min_date = date.today().replace(year=date.today().year - 16)
             birth_date = st.date_input(
-                "Birth Date",
-                help="Your birth date as provided in your application"
-            )
+                    "Date of Birth *", 
+                    min_value=date(1900, 1, 1), 
+                    max_value=min_date,
+                    help="Your birth date as provided in your application"
+                )
 
             submit_button = st.form_submit_button("Login", use_container_width=True)
 

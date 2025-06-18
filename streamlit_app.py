@@ -245,24 +245,3 @@ except Exception as e:
             if user:
                 st.write(f"User role: {user.get('role')}")
                 st.write(f"User email: {user.get('email')}")
-    
-    # Fallback navigation
-    st.subheader("Emergency Navigation")
-    if not is_authenticated():
-        col1, col2, col3, col4 = st.columns(4)
-        with col1:
-            if st.button("Home", use_container_width=True):
-                pg.public_home_page()
-        with col2:
-            if st.button("Apply", use_container_width=True):
-                pg.public_applications_page()
-        with col3:
-            if st.button("Scholar Login", use_container_width=True):
-                pg.public_scholar_login_page()
-        with col4:
-            if st.button("Admin Login", use_container_width=True):
-                pg.org_admin_login()
-    else:
-        if st.button("Logout", use_container_width=True):
-            logout()
-            st.rerun()
