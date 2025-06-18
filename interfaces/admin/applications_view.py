@@ -35,7 +35,7 @@ def admin_applications_page():
         search_term = st.text_input("Search by name or email", placeholder="Enter name or email...")
     
     with filter_col3:
-        if st.button("🔄 Refresh", use_container_width=True):
+        if st.button("Refresh", use_container_width=True):
             st.rerun()
     
     # Get applications data
@@ -51,7 +51,7 @@ def admin_applications_page():
     
     # Statistics Overview
     if applications:
-        st.header("📊 Applications Overview")
+        st.header("Applications Overview")
         
         # Create DataFrame for analysis
         df = pd.DataFrame(applications)
@@ -78,19 +78,19 @@ def admin_applications_page():
                 st.plotly_chart(fig, use_container_width=True)
         
         with stats_col:
-            st.metric("📋 Total Applications", len(applications))
+            st.metric("Total Applications", len(applications))
             
             if 'status' in df.columns:
                 pending_count = len(df[df['status'] == 'PENDING'])
                 approved_count = len(df[df['status'] == 'APPROVED'])
                 rejected_count = len(df[df['status'] == 'REJECTED'])
                 
-                st.metric("⏳ Pending", pending_count)
-                st.metric("✅ Approved", approved_count)
-                st.metric("❌ Rejected", rejected_count)
+                st.metric("Pending", pending_count)
+                st.metric("Approved", approved_count)
+                st.metric("Rejected", rejected_count)
     
     # Applications Table
-    st.header("📋 Applications List")
+    st.header("Applications List")
     
     if not applications:
         st.info("No applications found matching your criteria.")
@@ -104,27 +104,27 @@ def admin_applications_page():
             
             with col1:
                 st.write(f"**{app['first_name']} {app['last_name']}**")
-                st.caption(f"📧 {app['email']}")
+                st.caption(f"{app['email']}")
             
             with col2:
-                st.write(f"🌍 {app['country']}")
-                st.caption(f"🎓 {app['education_status']}")
+                st.write(f"{app['country']}")
+                st.caption(f"{app['education_status']}")
             
             with col3:
                 # Status badge
                 status_color = {
-                    'PENDING': '🟡',
-                    'APPROVED': '🟢', 
-                    'REJECTED': '🔴'
+                    'PENDING': 'Yellow',
+                    'APPROVED': 'Green', 
+                    'REJECTED': 'Red'
                 }
-                st.write(f"{status_color.get(app['status'], '⚫')} {app['status']}")
+                st.write(f"{status_color.get(app['status'], 'Gray')} {app['status']}")
                 
                 # Format date
                 applied_date = datetime.fromisoformat(app['applied_at'].replace('Z', '+00:00'))
-                st.caption(f"📅 {applied_date.strftime('%Y-%m-%d')}")
+                st.caption(f"{applied_date.strftime('%Y-%m-%d')}")
             
             with col4:
-                if st.button("👁️ View", key=f"view_{app['application_id']}", use_container_width=True):
+                if st.button("View", key=f"view_{app['application_id']}", use_container_width=True):
                     st.session_state[f"show_details_{app['application_id']}"] = True
             
             # Expandable details section
@@ -146,7 +146,7 @@ def display_application_details(application_id: str, admin_id: str, current_stat
         return
     
     # Basic Information
-    st.subheader("👤 Personal Information")
+    st.subheader("Personal Information")
     
     info_col1, info_col2 = st.columns(2)
     
@@ -163,7 +163,7 @@ def display_application_details(application_id: str, admin_id: str, current_stat
         st.write(f"**Postal Code:** {application['postal_code']}")
     
     # Education Details
-    st.subheader("🎓 Education Information")
+    st.subheader("Education Information")
     
     edu_col1, edu_col2 = st.columns(2)
     
@@ -175,7 +175,7 @@ def display_application_details(application_id: str, admin_id: str, current_stat
         st.write(f"**Institution Name:** {application['institution_name']}")
     
     # Experience and Skills
-    st.subheader("💻 Experience & Skills")
+    st.subheader("Experience & Skills")
     
     exp_col1, exp_col2, exp_col3 = st.columns(3)
     
@@ -189,7 +189,7 @@ def display_application_details(application_id: str, admin_id: str, current_stat
         st.write(f"**Weekly Commitment:** {application['weekly_time_commitment']} hours")
     
     # Demographics and Tech Access
-    st.subheader("📊 Demographics & Technology")
+    st.subheader("Demographics & Technology")
     
     demo_col1, demo_col2, demo_col3 = st.columns(3)
     
@@ -209,7 +209,7 @@ def display_application_details(application_id: str, admin_id: str, current_stat
             st.write(f"• {conn}")
     
     # Essay Responses
-    st.subheader("📝 Essay Responses")
+    st.subheader("Essay Responses")
     
     st.write("**Why do you want this scholarship?**")
     st.info(application['scholarship_reason'])
@@ -219,45 +219,51 @@ def display_application_details(application_id: str, admin_id: str, current_stat
     
     # Review Actions (only for pending applications)
     if current_status == 'PENDING':
-        st.subheader("⚖️ Review Actions")
+        st.subheader("Review Actions")
         
         review_col1, review_col2 = st.columns(2)
         
         with review_col1:
-            if st.button("✅ Approve Application", key=f"approve_{application_id}", type="primary", use_container_width=True):
+            if st.button("Approve Application", key=f"approve_{application_id}", type="primary", use_container_width=True):
                 reason = st.text_input("Approval reason (optional)", key=f"approve_reason_{application_id}")
                 
                 if approve_application(application_id, admin_id, reason):
-                    st.success("✅ Application approved successfully!")
+                    st.success("Application approved successfully!")
                     st.balloons()
                     # Remove the details from session state to hide the expanded view
                     if f"show_details_{application_id}" in st.session_state:
                         del st.session_state[f"show_details_{application_id}"]
                     st.rerun()
                 else:
-                    st.error("❌ Failed to approve application.")
+                    st.error("Failed to approve application. Please try again.")
         
         with review_col2:
-            if st.button("❌ Reject Application", key=f"reject_{application_id}", use_container_width=True):
-                reason = st.text_area("Rejection reason (required)", key=f"reject_reason_{application_id}")
+            with st.expander("Reject Application"):
+                rejection_reason = st.text_area(
+                    "Reason for rejection (required)", 
+                    key=f"reject_reason_{application_id}",
+                    placeholder="Please provide a detailed reason for rejection..."
+                )
                 
-                if reason and st.button("Confirm Rejection", key=f"confirm_reject_{application_id}", type="secondary"):
-                    if reject_application(application_id, admin_id, reason):
-                        st.error("❌ Application rejected.")
-                        # Remove the details from session state to hide the expanded view
-                        if f"show_details_{application_id}" in st.session_state:
-                            del st.session_state[f"show_details_{application_id}"]
-                        st.rerun()
+                if st.button("Confirm Rejection", key=f"reject_{application_id}", type="secondary", use_container_width=True):
+                    if not rejection_reason.strip():
+                        st.warning("Please provide a reason for rejection.")
                     else:
-                        st.error("❌ Failed to reject application.")
-                elif not reason:
-                    st.warning("⚠️ Please provide a reason for rejection.")
+                        if reject_application(application_id, admin_id, rejection_reason):
+                            st.success("Application rejected.")
+                            # Remove the details from session state  
+                            if f"show_details_{application_id}" in st.session_state:
+                                del st.session_state[f"show_details_{application_id}"]
+                            st.rerun()
+                        else:
+                            st.error("Failed to reject application. Please try again.")
     
     else:
         # Show current status for non-pending applications
-        st.subheader("📋 Current Status")
+        st.subheader("Current Status")
         status_colors = {
-            'APPROVED': '🟢',
-            'REJECTED': '🔴'
+            'APPROVED': 'Green',
+            'REJECTED': 'Red'
         }
-        st.info(f"{status_colors.get(current_status, '⚫')} This application has been **{current_status}**")
+        status_color = status_colors.get(current_status, 'Gray')
+        st.info(f"Status: {status_color} {current_status}")

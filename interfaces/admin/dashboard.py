@@ -23,34 +23,34 @@ def admin_dashboard_page():
     
     with col1:
         st.metric(
-            label="📋 Total Applications",
+            label="Total Applications",
             value=metrics['total_applications'],
             help="Total number of applications received"
         )
     
     with col2:
         st.metric(
-            label="✅ Approved Applications", 
+            label="Approved Applications", 
             value=metrics['approved_applications'],
             help="Number of applications approved"
         )
     
     with col3:
         st.metric(
-            label="🎓 Active Scholars",
+            label="Active Scholars",
             value=metrics['active_scholars'],
             help="Current number of active scholars"
         )
     
     with col4:
         st.metric(
-            label="📄 MoA Submissions",
+            label="MoA Submissions",
             value=metrics['moa_submissions'],
             help="Total MoA submissions received"
         )
     
     # Recent Activity Section
-    st.header("📈 Recent Activity")
+    st.header("Recent Activity")
     
     # Create two columns for charts and recent data
     chart_col, activity_col = st.columns([2, 1])
@@ -79,7 +79,7 @@ def admin_dashboard_page():
         # Approval rate
         if metrics['total_applications'] > 0:
             approval_rate = (metrics['approved_applications'] / metrics['total_applications']) * 100
-            st.metric("📊 Approval Rate", f"{approval_rate:.1f}%")
+            st.metric("Approval Rate", f"{approval_rate:.1f}%")
         
         # Recent scholars (last 5)
         recent_scholars = get_scholars_for_admin(partner_org_id)[:5]
@@ -96,37 +96,37 @@ def admin_dashboard_page():
             st.info("No scholars yet.")
     
     # Success Stories Section (placeholder for future implementation)
-    st.header("🌟 Success Stories")
+    st.header("Success Stories")
     
     success_col1, success_col2 = st.columns(2)
     
     with success_col1:
         st.subheader("Recent Certifications")
-        st.info("🚧 Feature coming soon - Track scholar certifications and achievements")
+        st.info("Feature coming soon - Track scholar certifications and achievements")
     
     with success_col2:
         st.subheader("Job Placements")
-        st.info("🚧 Feature coming soon - Monitor scholar career success")
+        st.info("Feature coming soon - Monitor scholar career success")
     
     # Quick Actions
-    st.header("⚡ Quick Actions")
+    st.header("Quick Actions")
     
     action_col1, action_col2, action_col3 = st.columns(3)
     
     with action_col1:
-        if st.button("📋 Review Applications", use_container_width=True):
+        if st.button("Review Applications", use_container_width=True):
             st.switch_page("interfaces/admin/applications_view.py")
     
     with action_col2:
-        if st.button("📄 Check MoA Submissions", use_container_width=True):
+        if st.button("Check MoA Submissions", use_container_width=True):
             st.switch_page("interfaces/admin/moa_view.py")
     
     with action_col3:
-        if st.button("🎓 View Scholars", use_container_width=True):
+        if st.button("View Scholars", use_container_width=True):
             st.switch_page("interfaces/admin/scholar_view.py")
     
     # System Information
-    st.header("ℹ️ System Information")
+    st.header("System Information")
     
     info_col1, info_col2 = st.columns(2)
     
@@ -138,6 +138,6 @@ def admin_dashboard_page():
     
     with info_col2:
         st.subheader("Platform Status")
-        st.success("🟢 System Online")
-        st.info("📊 All metrics updated in real-time")
-        st.info("🔄 Last updated: Just now")
+        st.success("System Online")
+        st.info("All metrics updated in real-time")
+        st.info("Last updated: Just now")

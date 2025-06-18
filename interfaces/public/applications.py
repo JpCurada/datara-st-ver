@@ -433,7 +433,7 @@ def public_applications_page():
                     # Save application to database
                     if save_application_to_database(st.session_state.form_data):
                         partner_org = st.session_state.form_data[steps[0]]["partner_org"]
-                        st.success(f"🎉 You successfully applied to {partner_org}!")
+                        st.success(f"You successfully applied to {partner_org}!")
                         st.info("**Instructions:** Please wait for an email confirmation. We will review your application and get back to you soon.")
                         
                         # Clear form data after successful submission

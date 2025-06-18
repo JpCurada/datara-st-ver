@@ -45,7 +45,7 @@ def public_scholar_login_page():
                             st.error("Invalid credentials. Please check your Scholar ID, email, and birth date.")
 
     with info_col:
-        st.info("ℹ️ **Scholar Login**")
+        st.info("**Scholar Login**")
         st.write("""
         **To access your scholar account:**
         1. Enter your DaTARA Scholar ID

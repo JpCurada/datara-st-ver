@@ -16,7 +16,7 @@ def scholar_dashboard_page():
     partner_org = scholar_data['partner_organizations']['display_name']
     
     # Welcome header
-    st.title(f"Welcome, {application_data['first_name']}! 🎓")
+    st.title(f"Welcome, {application_data['first_name']}!")
     st.subheader(f"DaTARA Scholar • {partner_org}")
     
     # Scholar ID and status
@@ -27,12 +27,12 @@ def scholar_dashboard_page():
     
     with status_col:
         if scholar_data['is_active']:
-            st.success("🟢 Active Scholar")
+            st.success("Active Scholar")
         else:
-            st.error("🔴 Inactive")
+            st.error("Inactive")
     
     # Quick Stats Dashboard
-    st.header("📊 Your Progress Overview")
+    st.header("Your Progress Overview")
     
     # Get scholar stats (placeholder for now)
     stats = get_scholar_stats(scholar_id)
@@ -41,35 +41,35 @@ def scholar_dashboard_page():
     
     with stat_col1:
         st.metric(
-            label="🏆 Certifications",
+            label="Certifications",
             value=stats.get('certifications', 0),
             help="Certifications earned through the program"
         )
     
     with stat_col2:
         st.metric(
-            label="📚 Courses Completed",
+            label="Courses Completed",
             value=stats.get('courses_completed', 0),
             help="Number of courses completed"
         )
     
     with stat_col3:
         st.metric(
-            label="📅 Days as Scholar",
+            label="Days as Scholar",
             value=stats.get('days_as_scholar', 0),
             help="Days since becoming a scholar"
         )
     
     with stat_col4:
         st.metric(
-            label="💼 Job Status",
+            label="Job Status",
             value=stats.get('employment_status', 'Seeking'),
             help="Current employment status"
         )
     
     # Main Dashboard Sections
     dashboard_tab1, dashboard_tab2, dashboard_tab3, dashboard_tab4 = st.tabs([
-        "🏠 Home", "📚 Learning", "🏆 Achievements", "💼 Career"
+        "Home", "Learning", "Achievements", "Career"
     ])
     
     with dashboard_tab1:
@@ -89,7 +89,7 @@ def display_home_section(scholar_data, application_data, partner_org):
     """Display the home/overview section"""
     
     # Welcome message and program info
-    st.subheader("🎉 Welcome to the DaTARA Program!")
+    st.subheader("Welcome to the DaTARA Program!")
     
     st.write(f"""
     Congratulations on becoming a **{partner_org}** scholar! You are now part of an exclusive 
@@ -100,7 +100,7 @@ def display_home_section(scholar_data, application_data, partner_org):
     col1, col2 = st.columns([2, 1])
     
     with col1:
-        st.subheader("👤 Your Profile")
+        st.subheader("Your Profile")
         
         profile_info = f"""
         **Full Name:** {application_data['first_name']} {application_data['last_name']}
@@ -111,39 +111,39 @@ def display_home_section(scholar_data, application_data, partner_org):
         st.markdown(profile_info)
         
         # Program benefits
-        st.subheader("🎁 Your Program Benefits")
+        st.subheader("Your Program Benefits")
         benefits = [
-            "🆓 Free access to premium courses and learning materials",
-            "🏆 Industry-recognized certifications upon completion",
-            "👥 Access to exclusive scholar community and networking",
-            "💼 Career support and job placement assistance",
-            "📊 Progress tracking and personalized learning paths",
-            "🎯 Mentorship opportunities with industry professionals"
+            "Free access to premium courses and learning materials",
+            "Industry-recognized certifications upon completion",
+            "Access to exclusive scholar community and networking",
+            "Career support and job placement assistance",
+            "Progress tracking and personalized learning paths",
+            "Mentorship opportunities with industry professionals"
         ]
         
         for benefit in benefits:
             st.write(benefit)
     
     with col2:
-        st.subheader("📈 Quick Actions")
+        st.subheader("Quick Actions")
         
         # Quick action buttons
-        if st.button("📚 Start Learning", use_container_width=True, type="primary"):
+        if st.button("Start Learning", use_container_width=True, type="primary"):
             st.switch_page("interfaces/scholar/learning.py")
         
-        if st.button("🏆 View Achievements", use_container_width=True):
+        if st.button("View Achievements", use_container_width=True):
             st.info("Navigate to the Achievements tab above!")
         
-        if st.button("💼 Update Career Info", use_container_width=True):
+        if st.button("Update Career Info", use_container_width=True):
             st.info("Navigate to the Career tab above!")
         
-        if st.button("👤 Edit Profile", use_container_width=True):
-            st.info("🚧 Profile editing coming soon!")
+        if st.button("Edit Profile", use_container_width=True):
+            st.info("Profile editing coming soon!")
         
         # Important announcements
-        st.subheader("📢 Announcements")
+        st.subheader("Announcements")
         st.info("""
-        **Welcome to DaTARA!** 🎉
+        **Welcome to DaTARA!**
         
         Start your learning journey today. 
         Complete your first course to unlock additional features!
@@ -153,13 +153,13 @@ def display_home_section(scholar_data, application_data, partner_org):
 def display_learning_section(scholar_id, partner_org):
     """Display learning progress and available courses"""
     
-    st.subheader("📚 Your Learning Journey")
+    st.subheader("Your Learning Journey")
     
     # Learning progress overview
     progress_col1, progress_col2 = st.columns([2, 1])
     
     with progress_col1:
-        st.subheader("📊 Learning Progress")
+        st.subheader("Learning Progress")
         
         # Progress bars (placeholder data)
         st.write("**Overall Program Progress**")
@@ -169,36 +169,36 @@ def display_learning_section(scholar_id, partner_org):
         st.progress(0.60, text="60% Complete - 4 of 10 modules")
         
         # Recent activity
-        st.subheader("🕒 Recent Activity")
+        st.subheader("Recent Activity")
         recent_activities = [
-            "✅ Completed: Python Basics Module",
-            "📖 Started: Data Visualization with Matplotlib", 
-            "🏆 Earned: Python Fundamentals Badge",
-            "💬 Joined: Study Group Discussion"
+            "Completed: Python Basics Module",
+            "Started: Data Visualization with Matplotlib", 
+            "Earned: Python Fundamentals Badge",
+            "Joined: Study Group Discussion"
         ]
         
         for activity in recent_activities:
             st.write(activity)
     
     with progress_col2:
-        st.subheader(f"📋 {partner_org} Curriculum")
+        st.subheader(f"{partner_org} Curriculum")
         
         # Course recommendations
         st.write("**Recommended Courses:**")
         courses = [
-            "🐍 Python for Data Science",
-            "📊 Data Analysis with Pandas", 
-            "📈 Data Visualization",
-            "🤖 Machine Learning Basics",
-            "🗄️ SQL for Data Analysis"
+            "Python for Data Science",
+            "Data Analysis with Pandas", 
+            "Data Visualization",
+            "Machine Learning Basics",
+            "SQL for Data Analysis"
         ]
         
         for course in courses:
             if st.button(course, use_container_width=True):
-                st.info(f"🚧 Course access coming soon!\n\nYou selected: {course}")
+                st.info(f"Course access coming soon!\n\nYou selected: {course}")
         
         # Study resources
-        st.subheader("📖 Study Resources")
+        st.subheader("Study Resources")
         st.write("• Course Materials")
         st.write("• Practice Datasets") 
         st.write("• Video Tutorials")
@@ -209,13 +209,13 @@ def display_learning_section(scholar_id, partner_org):
 def display_achievements_section(scholar_id):
     """Display certifications and achievements"""
     
-    st.subheader("🏆 Your Achievements")
+    st.subheader("Your Achievements")
     
     # Get certifications
     certifications = get_scholar_certifications(scholar_id)
     
     if certifications:
-        st.success(f"🎉 You have earned {len(certifications)} certification(s)!")
+        st.success(f"You have earned {len(certifications)} certification(s)!")
         
         for cert in certifications:
             with st.container():
@@ -227,7 +227,7 @@ def display_achievements_section(scholar_id):
                 
                 with cert_col2:
                     issue_date = f"{cert['issue_month']}/{cert['issue_year']}"
-                    st.write(f"📅 Issued: {issue_date}")
+                    st.write(f"Issued: {issue_date}")
                     
                     if cert.get('expiration_month'):
                         exp_date = f"{cert['expiration_month']}/{cert['expiration_year']}"
@@ -235,14 +235,14 @@ def display_achievements_section(scholar_id):
                 
                 with cert_col3:
                     if cert.get('credential_url'):
-                        st.link_button("🔗 View", cert['credential_url'])
+                        st.link_button("View", cert['credential_url'])
                 
                 st.divider()
     else:
-        st.info("🎯 No certifications yet. Complete your courses to earn certifications!")
+        st.info("No certifications yet. Complete your courses to earn certifications!")
     
     # Add new certification
-    st.subheader("➕ Add New Certification")
+    st.subheader("Add New Certification")
     
     with st.expander("Add a certification"):
         with st.form("add_certification"):
@@ -265,13 +265,13 @@ def display_achievements_section(scholar_id):
             
             if st.form_submit_button("Add Certification"):
                 # Here you would save to database
-                st.success("✅ Certification added successfully!")
+                st.success("Certification added successfully!")
 
 
 def display_career_section(scholar_id):
     """Display career development and job tracking"""
     
-    st.subheader("💼 Career Development")
+    st.subheader("Career Development")
     
     # Current employment status
     employment_status = get_scholar_employment_status(scholar_id)
@@ -279,42 +279,42 @@ def display_career_section(scholar_id):
     status_col1, status_col2 = st.columns([2, 1])
     
     with status_col1:
-        st.subheader("📊 Employment Status")
+        st.subheader("Employment Status")
         
         if employment_status:
-            st.success(f"🎉 Congratulations! Currently employed at **{employment_status['company']}**")
+            st.success(f"Congratulations! Currently employed at **{employment_status['company']}**")
             st.write(f"**Position:** {employment_status['job_title']}")
         else:
-            st.info("🔍 Currently seeking opportunities")
+            st.info("Currently seeking opportunities")
             
             # Job search resources
-            st.subheader("🔧 Job Search Resources")
+            st.subheader("Job Search Resources")
             resources = [
-                "📝 Resume building templates",
-                "💼 Interview preparation guides", 
-                "🌐 Networking opportunities",
-                "📊 Salary negotiation tips",
-                "🎯 Job matching services"
+                "Resume building templates",
+                "Interview preparation guides", 
+                "Networking opportunities",
+                "Salary negotiation tips",
+                "Job matching services"
             ]
             
             for resource in resources:
                 st.write(resource)
     
     with status_col2:
-        st.subheader("⚡ Quick Actions")
+        st.subheader("Quick Actions")
         
-        if st.button("📝 Update Employment", use_container_width=True):
+        if st.button("Update Employment", use_container_width=True):
             st.session_state['show_employment_form'] = True
         
-        if st.button("🎯 Job Resources", use_container_width=True):
-            st.info("🚧 Job resources portal coming soon!")
+        if st.button("Job Resources", use_container_width=True):
+            st.info("Job resources portal coming soon!")
         
-        if st.button("📊 Career Analytics", use_container_width=True):
-            st.info("🚧 Career tracking analytics coming soon!")
+        if st.button("Career Analytics", use_container_width=True):
+            st.info("Career tracking analytics coming soon!")
     
     # Employment update form
     if st.session_state.get('show_employment_form', False):
-        st.subheader("📝 Update Employment Information")
+        st.subheader("Update Employment Information")
         
         with st.form("employment_update"):
             job_title = st.text_input("Job Title")
@@ -328,16 +328,16 @@ def display_career_section(scholar_id):
             
             if st.form_submit_button("Update Employment Status"):
                 # Here you would save to database
-                st.success("✅ Employment information updated successfully!")
+                st.success("Employment information updated successfully!")
                 st.session_state['show_employment_form'] = False
                 st.rerun()
         
-        if st.button("❌ Cancel"):
+        if st.button("Cancel"):
             st.session_state['show_employment_form'] = False
             st.rerun()
     
     # Success stories from other scholars
-    st.subheader("🌟 Success Stories from Fellow Scholars")
+    st.subheader("Success Stories from Fellow Scholars")
     
     success_stories = [
         {
