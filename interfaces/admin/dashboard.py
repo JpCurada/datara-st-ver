@@ -48,9 +48,6 @@ def admin_dashboard_page():
     # Recent Activity and Quick Actions
     display_recent_activity(recent_applications, scholars)
     
-    # Quick Navigation
-    display_quick_actions()
-
 
 def display_key_metrics(metrics, org_stats):
     """Display key performance metrics"""
@@ -113,7 +110,7 @@ def display_application_trends(analytics, recent_applications):
     
     # Process data for trends
     df = pd.DataFrame(recent_applications)
-    df['applied_at'] = pd.to_datetime(df['applied_at'])
+    df['applied_at'] = pd.to_datetime(df['applied_at'], format='ISO8601')
     df['application_date'] = df['applied_at'].dt.date
     
     # Group by date
@@ -193,7 +190,7 @@ def display_scholar_timeline(scholars):
     
     # Process scholar data
     df = pd.DataFrame(scholars)
-    df['created_at'] = pd.to_datetime(df['created_at'])
+    df['created_at'] = pd.to_datetime(df['created_at'], format='ISO8601')
     df['enrollment_date'] = df['created_at'].dt.date
     
     # Group by date
@@ -254,41 +251,6 @@ def display_recent_activity(recent_applications, scholars):
                 st.divider()
         else:
             st.info("No scholars yet")
-
-
-def display_quick_actions():
-    """Display quick action buttons for navigation"""
-    st.header("Quick Actions")
-    
-    action_col1, action_col2, action_col3, action_col4 = st.columns(4)
-    
-    with action_col1:
-        if st.button("Review Applications", use_container_width=True, type="primary"):
-            st.switch_page("interfaces/admin/applications_view.py")
-        
-        pending_apps = st.session_state.get('pending_applications', 0)
-        if pending_apps > 0:
-            st.caption(f"{pending_apps} pending review")
-    
-    with action_col2:
-        if st.button("Check MoA Submissions", use_container_width=True):
-            st.switch_page("interfaces/admin/moa_view.py")
-        
-        pending_moas = st.session_state.get('pending_moas', 0)
-        if pending_moas > 0:
-            st.caption(f"{pending_moas} pending review")
-    
-    with action_col3:
-        if st.button("Manage Scholars", use_container_width=True):
-            st.switch_page("interfaces/admin/scholar_view.py")
-        
-        total_scholars = st.session_state.get('total_scholars', 0)
-        if total_scholars > 0:
-            st.caption(f"{total_scholars} active scholars")
-    
-    with action_col4:
-        if st.button("Export Reports", use_container_width=True):
-            generate_export_options()
 
 
 def generate_export_options():

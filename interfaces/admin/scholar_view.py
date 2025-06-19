@@ -142,7 +142,7 @@ def display_scholar_statistics(filtered_scholars, all_scholars):
                 for s in all_scholars
             ])
             
-            df['created_date'] = pd.to_datetime(df['created_date'])
+            df['created_date'] = pd.to_datetime(df['created_date'], format='ISO8601')
             df['enrollment_date'] = df['created_date'].dt.date
             daily_enrollments = df.groupby('enrollment_date').size().reset_index(name='count')
             

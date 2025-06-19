@@ -6,6 +6,8 @@ import streamlit as st
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from typing import List, Optional
+from services.email_service import send_otp_email as send_email_otp
+
 
 
 def _find_code(chosen_country: str) -> Optional[str]:
@@ -100,22 +102,13 @@ def get_universities_by_country(selected_country: str) -> List[str]:
         return ["API error - Please type manually"]
 
 
-def send_otp_email(email: str, otp: str) -> bool:
+def send_otp_email(email: str, otp: str, applicant_name: str = "Applicant") -> bool:
     """
-    Send OTP email to the applicant
-    In production, this should use a proper email service like SendGrid, AWS SES, etc.
+    Send OTP email to the applicant using the email service
     """
-    try:
-        # For now, we'll simulate sending email and store OTP in session state
-        # In production, you would implement actual email sending here
-        
-        st.session_state.sent_otp = otp
-        
-        # Log the OTP for development (remove in production)
-        st.info(f"🔧 **Development Mode**: OTP sent to {email}")
-        st.code(f"Your OTP: {otp}")
-        
-        return True
+    try:        
+        # Use the actual email service
+        return send_email_otp(email, otp, applicant_name)
         
     except Exception as e:
         st.error(f"Failed to send OTP email: {e}")

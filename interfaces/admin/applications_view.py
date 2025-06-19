@@ -324,7 +324,7 @@ def display_application_details(application_id, admin_id, current_status):
                     height=100
                 )
                 
-                if st.button("Approve Application", key=f"approve_{application_id}", type="primary", use_container_width=True):
+                if st.button("Approve Application", key=f"approve_{application_id}", type="primary"):
                     if approve_application(application_id, admin_id, approval_reason):
                         st.success("Application approved successfully!")
                         st.balloons()

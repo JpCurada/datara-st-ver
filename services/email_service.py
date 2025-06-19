@@ -1,14 +1,11 @@
-# utils/email_service.py
+# services/email_service.py - Complete email service with all functions
 import streamlit as st
 import smtplib
 import ssl
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from email.mime.base import MIMEBase
-from email import encoders
-import requests
 import os
-from typing import Optional, Dict, Any, List
+from typing import Optional
 from datetime import datetime
 import logging
 
@@ -18,44 +15,22 @@ logger = logging.getLogger(__name__)
 
 
 class EmailService:
-    """
-    Comprehensive email service supporting multiple providers:
-    1. Gmail SMTP
-    2. AWS SES (Simple Email Service)
-    3. Mailgun API
-    """
+    """Gmail SMTP email service"""
     
     def __init__(self):
-        self.provider = os.getenv("EMAIL_PROVIDER", "gmail")  # Default to Gmail
-        self.setup_provider()
+        self.smtp_server = st.secrets.email["smtp_server"]
+        self.smtp_port = st.secrets.email["smtp_port"]
+        self.sender_email = st.secrets.email["sender_email"]
+        self.sender_password = st.secrets.email["sender_password"]
     
-    def setup_provider(self):
-        """Setup email provider based on environment configuration"""
-        if self.provider == "gmail":
-            self.smtp_server = "smtp.gmail.com"
-            self.smtp_port = 587
-            self.username = os.getenv("GMAIL_USERNAME")
-            self.password = os.getenv("GMAIL_APP_PASSWORD")  # App-specific password
-                        
-        elif self.provider == "aws_ses":
-            self.aws_access_key = os.getenv("AWS_ACCESS_KEY_ID")
-            self.aws_secret_key = os.getenv("AWS_SECRET_ACCESS_KEY")
-            self.aws_region = os.getenv("AWS_REGION", "us-east-1")
-            
-        elif self.provider == "mailgun":
-            self.api_key = os.getenv("MAILGUN_API_KEY")
-            self.domain = os.getenv("MAILGUN_DOMAIN")
-    
-    def send_email_smtp(self, to_email: str, subject: str, html_content: str, text_content: str = None) -> bool:
-        """Send email using SMTP (Gmail, Outlook, etc.)"""
+    def send_email(self, to_email: str, subject: str, html_content: str, text_content: str = None) -> bool:
+        """Send email using Gmail SMTP"""
         try:
-            # Create message
             message = MIMEMultipart("alternative")
             message["Subject"] = subject
-            message["From"] = self.username
+            message["From"] = self.sender_email
             message["To"] = to_email
             
-            # Add text and HTML parts
             if text_content:
                 text_part = MIMEText(text_content, "plain")
                 message.attach(text_part)
@@ -63,59 +38,21 @@ class EmailService:
             html_part = MIMEText(html_content, "html")
             message.attach(html_part)
             
-            # Create secure connection and send email
             context = ssl.create_default_context()
             with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
                 server.starttls(context=context)
-                server.login(self.username, self.password)
+                server.login(self.sender_email, self.sender_password)
                 text = message.as_string()
-                server.sendmail(self.username, to_email, text)
+                server.sendmail(self.sender_email, to_email, text)
             
-            logger.info(f"Email sent successfully to {to_email} via SMTP")
+            logger.info(f"Email sent successfully to {to_email}")
             return True
             
         except Exception as e:
-            logger.error(f"Failed to send email via SMTP: {str(e)}")
-            return False
-    
-    def send_email_mailgun(self, to_email: str, subject: str, html_content: str, text_content: str = None) -> bool:
-        """Send email using Mailgun API"""
-        try:
-            response = requests.post(
-                f"https://api.mailgun.net/v3/{self.domain}/messages",
-                auth=("api", self.api_key),
-                data={
-                    "from": f"DaTARA Platform <noreply@{self.domain}>",
-                    "to": [to_email],
-                    "subject": subject,
-                    "text": text_content or "",
-                    "html": html_content
-                }
-            )
-            
-            if response.status_code == 200:
-                logger.info(f"Email sent successfully to {to_email} via Mailgun")
-                return True
-            else:
-                logger.error(f"Mailgun API error: {response.status_code}")
-                return False
-                
-        except Exception as e:
-            logger.error(f"Failed to send email via Mailgun: {str(e)}")
-            return False
-    
-    def send_email(self, to_email: str, subject: str, html_content: str, text_content: str = None) -> bool:
-        """Main method to send email using configured provider"""
-        if self.provider == "gmail":
-            return self.send_email_smtp(to_email, subject, html_content, text_content)
-        elif self.provider == "mailgun":
-            return self.send_email_mailgun(to_email, subject, html_content, text_content)
-        else:
-            logger.error(f"Unsupported email provider: {self.provider}")
+            logger.error(f"Failed to send email: {str(e)}")
             return False
 
 
-# Email Templates
 class EmailTemplates:
     """HTML email templates for different scenarios"""
     
@@ -168,9 +105,6 @@ class EmailTemplates:
                     border-radius: 5px;
                     margin: 20px 0;
                     font-weight: bold;
-                }}
-                .button:hover {{
-                    background-color: #45a049;
                 }}
                 .otp-box {{
                     background-color: #f8f9fa;
@@ -229,7 +163,7 @@ class EmailTemplates:
                     {content}
                 </div>
                 <div class="footer">
-                    <p>© 2024 DaTARA Platform. All rights reserved.</p>
+                    <p>&copy; 2024 DaTARA Platform. All rights reserved.</p>
                     <p>This email was sent from an automated system. Please do not reply to this email.</p>
                     <p>If you have questions, contact us at <a href="mailto:support@datara.org">support@datara.org</a></p>
                 </div>
@@ -239,7 +173,7 @@ class EmailTemplates:
         """
     
     @staticmethod
-    def otp_verification_email(otp_code: str, applicant_name: str) -> tuple[str, str]:
+    def otp_verification_email(otp_code: str, applicant_name: str) -> tuple[str, str, str]:
         """Email template for OTP verification"""
         subject = "Verify Your DaTARA Application - OTP Code"
         
@@ -288,9 +222,9 @@ class EmailTemplates:
         return subject, full_html, text_content
     
     @staticmethod
-    def application_approval_email(applicant_name: str, partner_org: str, scholar_id: str, 
-                                 email: str, birthdate: str, login_url: str) -> tuple[str, str]:
-        """Email template for application approval with scholar credentials"""
+    def application_approval_email(applicant_name: str, partner_org: str, approved_applicant_id: str, 
+                                 email: str, birthdate: str, login_url: str) -> tuple[str, str, str]:
+        """Email template for application approval with approved applicant credentials"""
         subject = f"Congratulations! Your {partner_org} Application is APPROVED"
         
         html_content = f"""
@@ -302,30 +236,30 @@ class EmailTemplates:
         
         <p>Welcome to the DaTARA community! You are now one step closer to becoming an active scholar.</p>
         
-        <h3>Next Steps - Important Information</h3>
+        <h3>Your Login Credentials</h3>
         
         <div class="credentials-box">
-            <h4>Your Scholar Login Credentials:</h4>
+            <h4>Use these credentials to access the platform:</h4>
             <ul>
-                <li><strong>Scholar ID:</strong> {scholar_id}</li>
+                <li><strong>Approved Applicant ID:</strong> {approved_applicant_id}</li>
                 <li><strong>Email:</strong> {email}</li>
                 <li><strong>Birth Date:</strong> {birthdate}</li>
             </ul>
         </div>
         
         <div class="warning">
-            <h4>Required Actions:</h4>
+            <h4>Required Next Steps:</h4>
             <ol>
-                <li><strong>Login to Platform:</strong> Use the credentials above</li>
-                <li><strong>Download MoA:</strong> Get the Memorandum of Agreement template</li>
-                <li><strong>Sign Digitally:</strong> Complete and sign the MoA document</li>
-                <li><strong>Submit MoA:</strong> Upload the signed document for review</li>
-                <li><strong>Wait for Final Approval:</strong> 2-3 business days processing time</li>
+                <li><strong>Login to Platform:</strong> Use the "Scholar & Approved Applicant Login" page</li>
+                <li><strong>Submit MoA:</strong> Complete and submit your Memorandum of Agreement</li>
+                <li><strong>Wait for Approval:</strong> 2-3 business days for MoA review</li>
+                <li><strong>Receive Scholar ID:</strong> Get your final Scholar ID via email</li>
+                <li><strong>Access Full Program:</strong> Begin your learning journey!</li>
             </ol>
         </div>
         
         <div style="text-align: center; margin: 30px 0;">
-            <a href="{login_url}" class="button">Access Scholar Portal</a>
+            <a href="{login_url}" class="button">Login to Platform</a>
         </div>
         
         <h3>About the MoA (Memorandum of Agreement)</h3>
@@ -334,7 +268,7 @@ class EmailTemplates:
             <li>Program expectations and requirements</li>
             <li>Your commitments as a scholar</li>
             <li>Code of conduct and community guidelines</li>
-            <li>Certification and completion requirements</li>
+            <li>Benefits and support you'll receive</li>
         </ul>
         
         <p><strong>Important:</strong> You must complete the MoA submission within 7 days to maintain your approved status.</p>
@@ -353,16 +287,16 @@ class EmailTemplates:
         
         Your application for the {partner_org} Data Science Scholarship has been APPROVED!
         
-        Your Scholar Credentials:
-        - Scholar ID: {scholar_id}
+        Your Login Credentials:
+        - Approved Applicant ID: {approved_applicant_id}
         - Email: {email}
         - Birth Date: {birthdate}
         
         Next Steps:
-        1. Login to the platform using the credentials above
-        2. Download and complete the MoA (Memorandum of Agreement)
-        3. Submit the signed MoA for final approval
-        4. Wait 2-3 business days for processing
+        1. Login to the platform using the Scholar & Approved Applicant Login page
+        2. Submit your MoA (Memorandum of Agreement)
+        3. Wait 2-3 business days for MoA approval
+        4. Receive your Scholar ID and full program access
         
         Login URL: {login_url}
         
@@ -377,7 +311,7 @@ class EmailTemplates:
     
     @staticmethod
     def scholar_activation_email(scholar_name: str, partner_org: str, scholar_id: str, 
-                               platform_url: str) -> tuple[str, str]:
+                               platform_url: str) -> tuple[str, str, str]:
         """Email template for final scholar activation after MoA approval"""
         subject = f"Welcome to {partner_org}! You're Now an Active Scholar"
         
@@ -411,29 +345,29 @@ class EmailTemplates:
         </ul>
         
         <div style="text-align: center; margin: 30px 0;">
-            <a href="{platform_url}" class="button">Start Your Learning Journey</a>
+            <a href="{platform_url}" class="button">Access Scholar Dashboard</a>
         </div>
         
         <div class="warning">
             <h4>Important Timeline:</h4>
-            <p><strong>DataCamp Group Invitation:</strong> You will receive your {partner_org} group invitation within <strong>1-2 business days</strong>. This will give you direct access to the course platform.</p>
+            <p><strong>{partner_org} Platform Access:</strong> You will receive your {partner_org} course platform invitation within <strong>1-2 business days</strong>. This will give you direct access to the learning platform.</p>
         </div>
         
         <h3>Recommended Next Steps:</h3>
         <ol>
-            <li><strong>Complete Your Profile:</strong> Add a profile picture and bio</li>
-            <li><strong>Explore the Course Catalog:</strong> Browse available courses and learning paths</li>
+            <li><strong>Complete Your Profile:</strong> Add a profile picture and bio in your dashboard</li>
+            <li><strong>Explore Available Courses:</strong> Browse the {partner_org} course catalog</li>
             <li><strong>Join the Community:</strong> Introduce yourself in the scholar forums</li>
             <li><strong>Set Learning Goals:</strong> Define your 3-month and 6-month objectives</li>
-            <li><strong>Start Your First Course:</strong> We recommend beginning with "Introduction to Data Science"</li>
+            <li><strong>Start Your First Course:</strong> Begin with foundational data science topics</li>
         </ol>
         
         <h3>Support & Resources:</h3>
         <ul>
-            <li><strong>Technical Support:</strong> tech-support@datara.org</li>
-            <li><strong>Academic Guidance:</strong> academic-support@datara.org</li>
-            <li><strong>Community Forums:</strong> Available in your scholar dashboard</li>
-            <li><strong>Live Office Hours:</strong> Weekly Q&A sessions (details in platform)</li>
+            <li><strong>Technical Support:</strong> support@datara.org</li>
+            <li><strong>Academic Guidance:</strong> Available through your scholar dashboard</li>
+            <li><strong>Community Forums:</strong> Access via your scholar portal</li>
+            <li><strong>Live Support:</strong> Regular Q&A sessions (details in platform)</li>
         </ul>
         
         <p>We're incredibly excited to have you as part of our community. Your dedication to learning and growth inspires us, and we're here to support you every step of the way.</p>
@@ -452,9 +386,11 @@ class EmailTemplates:
         
         Congratulations! Your MoA has been approved and you are now an ACTIVE SCHOLAR in the {partner_org} program!
         
-        Scholar ID: {scholar_id}
-        Partner Organization: {partner_org}
-        Status: Active Scholar
+        Scholar Information:
+        - Scholar ID: {scholar_id}
+        - Partner Organization: {partner_org}
+        - Status: Active Scholar
+        - Program Start Date: {datetime.now().strftime('%B %d, %Y')}
         
         What you now have access to:
         - Free premium courses from {partner_org}
@@ -464,9 +400,9 @@ class EmailTemplates:
         - Progress tracking and personalized learning
         - Mentorship opportunities
         
-        Important: You will receive your {partner_org} group invitation within 1-2 business days.
+        Important: You will receive your {partner_org} platform invitation within 1-2 business days.
         
-        Start your learning journey: {platform_url}
+        Access your scholar dashboard: {platform_url}
         
         Welcome to the DaTARA family!
         
@@ -501,10 +437,10 @@ def send_otp_email(email: str, otp: str, applicant_name: str) -> bool:
 
 def send_approval_email(email: str, applicant_name: str, partner_org: str, 
                        scholar_id: str, birthdate: str) -> bool:
-    """Send application approval email with scholar credentials"""
+    """Send application approval email with approved applicant credentials"""
     try:
         email_service = EmailService()
-        login_url = os.getenv("PLATFORM_URL", "https://your-datara-platform.streamlit.app")
+        login_url = st.secrets.general.get("platform_url", "https://your-datara-platform.streamlit.app")
         
         subject, html_content, text_content = EmailTemplates.application_approval_email(
             applicant_name, partner_org, scholar_id, email, birthdate, login_url
@@ -528,7 +464,7 @@ def send_scholar_activation_email(email: str, scholar_name: str, partner_org: st
     """Send scholar activation email after MoA approval"""
     try:
         email_service = EmailService()
-        platform_url = os.getenv("PLATFORM_URL", "https://your-datara-platform.streamlit.app")
+        platform_url = st.secrets.general.get("platform_url", "https://your-datara-platform.streamlit.app")
         
         subject, html_content, text_content = EmailTemplates.scholar_activation_email(
             scholar_name, partner_org, scholar_id, platform_url
@@ -545,4 +481,85 @@ def send_scholar_activation_email(email: str, scholar_name: str, partner_org: st
             
     except Exception as e:
         logger.error(f"Error sending scholar activation email: {str(e)}")
+        return False
+
+
+def send_application_confirmation_email(email: str, applicant_name: str, partner_org: str) -> bool:
+    """Send application confirmation email"""
+    try:
+        email_service = EmailService()
+        
+        subject = f"Application Received - {partner_org} Scholarship"
+        
+        html_content = f"""
+        <h2>Dear {applicant_name},</h2>
+        
+        <div class="success">
+            <h3>Thank you for applying to the {partner_org} Data Science Scholarship program!</h3>
+        </div>
+        
+        <p>Your application has been received and is under review. You will receive an email notification within 2-3 business days regarding the status of your application.</p>
+        
+        <div class="credentials-box">
+            <h4>Application Details:</h4>
+            <ul>
+                <li><strong>Applicant:</strong> {applicant_name}</li>
+                <li><strong>Email:</strong> {email}</li>
+                <li><strong>Partner Organization:</strong> {partner_org}</li>
+                <li><strong>Submitted:</strong> {datetime.now().strftime('%B %d, %Y at %I:%M %p')}</li>
+            </ul>
+        </div>
+        
+        <p>What happens next:</p>
+        <ol>
+            <li>Our partner organization will review your application</li>
+            <li>You'll receive an email with the decision within 2-3 business days</li>
+            <li>If approved, you'll receive login credentials to access the platform</li>
+            <li>You'll then complete the MoA submission process</li>
+        </ol>
+        
+        <p>Thank you for your interest in advancing your data science skills with DaTARA!</p>
+        
+        <p>Best regards,<br>
+        <strong>The DaTARA Team</strong></p>
+        """
+        
+        text_content = f"""
+        Dear {applicant_name},
+        
+        Thank you for applying to the {partner_org} Data Science Scholarship program!
+        
+        Your application has been received and is under review. You will receive an email notification within 2-3 business days regarding the status of your application.
+        
+        Application Details:
+        - Applicant: {applicant_name}
+        - Email: {email}
+        - Partner Organization: {partner_org}
+        - Submitted: {datetime.now().strftime('%B %d, %Y at %I:%M %p')}
+        
+        What happens next:
+        1. Our partner organization will review your application
+        2. You'll receive an email with the decision within 2-3 business days
+        3. If approved, you'll receive login credentials to access the platform
+        4. You'll then complete the MoA submission process
+        
+        Thank you for your interest in advancing your data science skills with DaTARA!
+        
+        Best regards,
+        The DaTARA Team
+        """
+        
+        full_html = EmailTemplates.get_base_template().format(content=html_content)
+        
+        success = email_service.send_email(email, subject, full_html, text_content)
+        
+        if success:
+            logger.info(f"Confirmation email sent successfully to {email}")
+            return True
+        else:
+            logger.error(f"Failed to send confirmation email to {email}")
+            return False
+            
+    except Exception as e:
+        logger.error(f"Error sending confirmation email: {str(e)}")
         return False

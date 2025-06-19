@@ -1,8 +1,8 @@
-# streamlit_app.py - Enhanced version with complete functionality and persistent auth
+# streamlit_app.py - Enhanced version with unified authentication
 import streamlit as st
 import os
 import interfaces as pg
-from utils.auth import is_authenticated, is_admin, is_scholar, get_current_user, logout
+from utils.auth import is_authenticated, is_admin, is_scholar, is_approved_applicant, get_current_user, logout
 
 st.set_page_config(
     page_title="DaTARA - Data Science Scholarship Platform",
@@ -22,10 +22,9 @@ try:
     with open(css_path) as css:
         st.markdown(f'<style>{css.read()}</style>', unsafe_allow_html=True)
 except FileNotFoundError:
-    # Fallback if CSS file not found
     pass
 
-# Define all pages with enhanced structure
+# Define all pages
 public_home = st.Page(page=pg.public_home_page, title='Home')
 public_applications = st.Page(page=pg.public_applications_page, title='Apply Now')
 public_scholar_login = st.Page(page=pg.public_scholar_login_page, title='Scholar Login')
@@ -37,14 +36,8 @@ admin_applications = st.Page(page=pg.admin_applications_page, title='Application
 admin_scholars = st.Page(page=pg.admin_scholars_page, title='Scholars')
 admin_moa = st.Page(page=pg.admin_moa_page, title='MoA Records')
 
-# Scholar Pages
+# Scholar Pages (handles both scholars and approved applicants)
 scholar_dashboard = st.Page(page=pg.scholar_dashboard_page, title='Dashboard')
-
-# Helper function to create navigation buttons
-def create_nav_button(page, label, is_current=False):
-    """Create a styled navigation button"""
-    button_type = "primary" if is_current else "secondary"
-    return st.button(label, key=f"nav_{label}", use_container_width=True, type=button_type)
 
 # Main navigation logic
 if not is_authenticated():
@@ -88,7 +81,6 @@ elif is_admin():
     # === ADMIN NAVIGATION ===
     user = get_current_user()
     
-    # Handle case where user data might be None after refresh
     if not user:
         st.error("Session expired. Please log in again.")
         logout()
@@ -110,7 +102,6 @@ elif is_admin():
             st.caption(f"{partner_org_name} Admin")
         
         with header_col2:
-            # Quick stats or notifications can go here
             st.info("Dashboard • Real-time updates")
         
         with header_col3:
@@ -142,20 +133,30 @@ elif is_admin():
         
         st.divider()
 
-elif is_scholar():
-    # === SCHOLAR NAVIGATION ===
+elif is_scholar() or is_approved_applicant():
+    # === SCHOLAR & APPROVED APPLICANT NAVIGATION ===
     user = get_current_user()
     
-    # Handle case where user data might be None after refresh
     if not user:
         st.error("Session expired. Please log in again.")
         logout()
         st.rerun()
     
-    scholar_data = user['data']
-    application_data = scholar_data['applications']
-    scholar_name = application_data['first_name']
-    scholar_id = user['scholar_id']
+    # Handle both scholars and approved applicants
+    if is_scholar():
+        scholar_data = user['data']
+        application_data = scholar_data['applications']
+        scholar_name = application_data['first_name']
+        scholar_id = user['scholar_id']
+        status = "Active Scholar"
+        partner_org = scholar_data['partner_organizations']['display_name']
+    else:  # is_approved_applicant()
+        applicant_data = user['data']
+        application_data = applicant_data['applications']
+        scholar_name = application_data['first_name']
+        scholar_id = user['approved_applicant_id']
+        status = "Approved Applicant"
+        partner_org = applicant_data['partner_organizations']['display_name']
     
     pg_nav = st.navigation({
         f"Scholar Portal": [scholar_dashboard]
@@ -167,15 +168,14 @@ elif is_scholar():
         
         with scholar_header_col1:
             st.markdown(f"### Welcome, **{scholar_name}**")
-            st.caption(f"Scholar ID: {scholar_id}")
+            st.caption(f"ID: {scholar_id}")
         
         with scholar_header_col2:
-            # Scholar status and program info
-            if scholar_data['is_active']:
+            if is_scholar():
                 st.success("Active Scholar")
             else:
-                st.error("Account Inactive")
-            st.caption(f"{scholar_data['partner_organizations']['display_name']} Program")
+                st.warning("MoA Submission Required")
+            st.caption(f"{partner_org} Program")
         
         with scholar_header_col3:
             # Scholar navigation buttons
@@ -183,7 +183,7 @@ elif is_scholar():
                 scholar_nav = st.columns(4)
                 
                 with scholar_nav[0]:
-                    if st.button("Home", use_container_width=True):
+                    if st.button("Dashboard", use_container_width=True):
                         st.switch_page(scholar_dashboard)
                 
                 with scholar_nav[1]:
@@ -192,7 +192,10 @@ elif is_scholar():
                 
                 with scholar_nav[2]:
                     if st.button("Learning", use_container_width=True):
-                        st.info("Learning portal coming soon!")
+                        if is_scholar():
+                            st.info("Learning portal coming soon!")
+                        else:
+                            st.info("Available after MoA approval")
                 
                 with scholar_nav[3]:
                     if st.button("Logout", use_container_width=True, type="secondary"):
@@ -212,7 +215,7 @@ def add_footer():
         if is_authenticated():
             user = get_current_user()
             if user:
-                role = user['role'].title()
+                role = user['role'].replace('_', ' ').title()
                 st.caption(f"Logged in as {role}")
             else:
                 st.caption("Session loading...")
@@ -226,8 +229,6 @@ def add_footer():
 # Run the navigation
 try:
     pg_nav.run()
-    
-    # Add footer to all pages
     add_footer()
     
 except Exception as e:
@@ -240,29 +241,9 @@ except Exception as e:
         st.write(f"Authenticated: {is_authenticated()}")
         st.write(f"Admin: {is_admin()}")
         st.write(f"Scholar: {is_scholar()}")
+        st.write(f"Approved Applicant: {is_approved_applicant()}")
         if is_authenticated():
             user = get_current_user()
             if user:
                 st.write(f"User role: {user.get('role')}")
                 st.write(f"User email: {user.get('email')}")
-    
-    # Fallback navigation
-    st.subheader("Emergency Navigation")
-    if not is_authenticated():
-        col1, col2, col3, col4 = st.columns(4)
-        with col1:
-            if st.button("Home", use_container_width=True):
-                pg.public_home_page()
-        with col2:
-            if st.button("Apply", use_container_width=True):
-                pg.public_applications_page()
-        with col3:
-            if st.button("Scholar Login", use_container_width=True):
-                pg.public_scholar_login_page()
-        with col4:
-            if st.button("Admin Login", use_container_width=True):
-                pg.org_admin_login()
-    else:
-        if st.button("Logout", use_container_width=True):
-            logout()
-            st.rerun()
