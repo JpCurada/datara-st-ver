@@ -491,6 +491,83 @@ def refresh_user_session():
         clear_auth_session()
         return False
 
+def approved_applicant_login_auth(approved_applicant_id: str, email: str, birth_date: str) -> bool:
+    """
+    Authentication for approved applicants using ID, email, and birth date
+    Similar to scholar login but for approved applicants
+    """
+    supabase = get_supabase_client()
+    
+    try:
+        response = supabase.table("approved_applicants").select(
+            "approved_applicant_id, application_id, created_at, "
+            "applications!inner(email, birthdate, first_name, last_name, partner_org_id), "
+            "partner_organizations!inner(display_name)"
+        ).eq("approved_applicant_id", approved_applicant_id).execute()
+        
+        if response.data:
+            applicant_data = response.data[0]
+            application_data = applicant_data['applications']
+            
+            # Verify email and birth date
+            if (application_data['email'].lower() == email.lower() and 
+                str(application_data['birthdate']) == str(birth_date)):
+                
+                # Check if they haven't become a scholar yet
+                scholar_check = supabase.table("scholars").select("scholar_id").eq("application_id", applicant_data['application_id']).execute()
+                
+                if scholar_check.data:
+                    # They're already a scholar, redirect them
+                    st.error("You are already a scholar! Please use Scholar Login instead.")
+                    st.info(f"Your Scholar ID: {scholar_check.data[0]['scholar_id']}")
+                    return False
+                
+                # Create session data
+                session_data = {
+                    'auth_user': None,
+                    'role': 'approved_applicant',
+                    'data': applicant_data,
+                    'partner_org_id': applicant_data['applications']['partner_org_id'],
+                    'permissions': ['submit_moa', 'view_moa_status'],
+                    'email': email,
+                    'approved_applicant_id': approved_applicant_id
+                }
+                
+                # Save session
+                st.session_state.user_data = session_data
+                st.session_state.auth_timestamp = time.time()
+                
+                return True
+        
+        return False
+        
+    except Exception as e:
+        st.error(f"Approved applicant login failed: {e}")
+        return False
+
+
+def is_approved_applicant() -> bool:
+    """Check if current user is an approved applicant"""
+    return (is_authenticated() and 
+            st.session_state.user_data.get('role') == 'approved_applicant')
+
+
+# Add to require_auth function
+def require_auth(role: Optional[Literal['admin', 'scholar', 'approved_applicant']] = None):
+    """
+    Enhanced require_auth to support approved_applicant role
+    """
+    init_auth_state()
+    
+    if not is_authenticated():
+        st.error("Please log in to access this page.")
+        st.info("Use the navigation menu to access the login page.")
+        st.stop()
+    
+    if role and get_current_user().get('role') != role:
+        st.error(f"Access denied. {role.replace('_', ' ').title()} role required.")
+        st.info("You don't have permission to access this page.")
+        st.stop()
 
 # Auto-initialize auth state when module is imported
 init_auth_state()

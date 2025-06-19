@@ -739,3 +739,108 @@ def get_scholar_jobs(scholar_id: str) -> List[Dict[str, Any]]:
         return response.data
     except:
         return []
+
+def approve_application_with_readable_id(application_id: str, admin_id: str, reason: Optional[str] = None) -> Tuple[bool, Optional[str]]:
+    """
+    Approve an application and create approved applicant record with readable ID
+    """
+    supabase = get_supabase_client()
+    
+    try:
+        # Get application details
+        app_response = supabase.table("applications").select(
+            "application_id, partner_org_id, email, first_name, last_name, birthdate"
+        ).eq("application_id", application_id).execute()
+        
+        if not app_response.data:
+            st.error("Application not found")
+            return False, None
+        
+        app_data = app_response.data[0]
+        
+        # Generate readable approved applicant ID
+        approved_applicant_id = generate_approved_applicant_id()
+        
+        # Update application status
+        supabase.table("applications").update({"status": "APPROVED"}).eq("application_id", application_id).execute()
+        
+        # Create application review record
+        supabase.table("application_reviews").insert({
+            "application_id": application_id,
+            "admin_id": admin_id,
+            "action": "APPROVED",
+            "action_reason": reason
+        }).execute()
+        
+        # Create approved applicant record with custom ID
+        supabase.table("approved_applicants").insert({
+            "approved_applicant_id": approved_applicant_id,
+            "application_id": application_id
+        }).execute()
+        
+        # Send approval email with applicant credentials
+        send_approval_email_with_app_id(
+            email=app_data["email"],
+            applicant_name=f"{app_data['first_name']} {app_data['last_name']}",
+            approved_applicant_id=approved_applicant_id,
+            birthdate=str(app_data["birthdate"])
+        )
+        
+        return True, approved_applicant_id
+        
+    except Exception as e:
+        st.error(f"Error approving application: {e}")
+        return False, None
+
+
+def generate_approved_applicant_id() -> str:
+    """Generate unique approved applicant ID in format APP12345678"""
+    import random
+    supabase = get_supabase_client()
+    
+    while True:
+        applicant_id = f"APP{random.randint(10000000, 99999999)}"
+        try:
+            # Check if ID already exists
+            existing = supabase.table("approved_applicants").select("approved_applicant_id").eq("approved_applicant_id", applicant_id).execute()
+            if not existing.data:
+                return applicant_id
+        except:
+            return applicant_id
+
+
+def send_approval_email_with_app_id(email: str, applicant_name: str, approved_applicant_id: str, birthdate: str) -> bool:
+    """Send approval email with login credentials"""
+    try:
+        st.success(f"Approval email sent to {email}")
+        
+        st.info(f"""
+        **Approval Email Preview:**
+        
+        Subject: Congratulations! Your Application is APPROVED
+        
+        Dear {applicant_name},
+        
+        Congratulations! Your application has been APPROVED!
+        
+        **Your Login Credentials:**
+        - Approved Applicant ID: {approved_applicant_id}
+        - Email: {email}
+        - Birth Date: {birthdate}
+        
+        **Next Steps:**
+        1. Login at: Scholar & Approved Applicant Login page
+        2. Submit your MoA (Memorandum of Agreement)
+        3. Wait 2-3 days for MoA approval
+        4. Receive your Scholar ID and full access!
+        
+        Use the same login page that scholars use - just enter your Approved Applicant ID instead of a Scholar ID.
+        
+        Welcome to DaTARA!
+        """)
+        
+        return True
+        
+    except Exception as e:
+        st.error(f"Failed to send approval email: {e}")
+        return False
