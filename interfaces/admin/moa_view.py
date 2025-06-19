@@ -1,4 +1,4 @@
-# interfaces/admin/moa_view.py
+# interfaces/admin/moa_view.py - Enhanced MoA management with proper approval flow
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -144,7 +144,7 @@ def display_moa_statistics(filtered_moas, all_moas):
         
         with chart_col2:
             # Submissions over time
-            df['submitted_date'] = pd.to_datetime(df['submitted_date'])
+            df['submitted_date'] = pd.to_datetime(df['submitted_date'], format='ISO8601')
             df['submission_date'] = df['submitted_date'].dt.date
             daily_counts = df.groupby('submission_date').size().reset_index(name='count')
             
@@ -178,7 +178,7 @@ def display_moa_table(moa_submissions, admin_id):
             'Status': moa['status'],
             'Submitted': submitted_date.strftime('%Y-%m-%d %H:%M'),
             'Days Ago': (datetime.now().replace(tzinfo=submitted_date.tzinfo) - submitted_date).days,
-            'Full ID': moa['moa_id']  # Hidden column for operations
+            'Full ID': moa['moa_id']
         })
     
     df = pd.DataFrame(table_data)
@@ -241,7 +241,7 @@ def display_moa_table(moa_submissions, admin_id):
             if selected_row['Status'] in ['PENDING', 'SUBMITTED']:
                 if st.button("Quick Approve", use_container_width=True, type="primary"):
                     if approve_moa_submission(selected_id, admin_id):
-                        st.success("MoA approved!")
+                        st.success("MoA approved and Scholar activated!")
                         st.rerun()
                 
                 if st.button("Request Revision", use_container_width=True):
@@ -322,7 +322,8 @@ def display_moa_details(moa, admin_id):
         if review_history:
             for review in review_history:
                 review_date = datetime.fromisoformat(review['reviewed_at'].replace('Z', '+00:00'))
-                st.write(f"**{review['action']}** on {review_date.strftime('%Y-%m-%d %H:%M')}")
+                admin_name = f"{review['admins']['first_name']} {review['admins']['last_name']}"
+                st.write(f"**{review['action']}** by {admin_name} on {review_date.strftime('%Y-%m-%d %H:%M')}")
                 if review.get('action_reason'):
                     st.write(f"Reason: {review['action_reason']}")
                 st.divider()
@@ -342,7 +343,7 @@ def display_moa_details(moa, admin_id):
                 
                 if st.button("Approve MoA", key=f"approve_moa_{moa_id}", type="primary", use_container_width=True):
                     if approve_moa_submission(moa_id, admin_id, approval_reason):
-                        st.success("MoA approved successfully!")
+                        st.success("MoA approved successfully! Scholar has been activated and notification email sent.")
                         st.balloons()
                         if f"show_moa_details_{moa_id}" in st.session_state:
                             del st.session_state[f"show_moa_details_{moa_id}"]
@@ -376,8 +377,11 @@ def display_moa_details(moa, admin_id):
                     st.info("MoA download feature coming soon.")
                 
                 if st.button("Contact Applicant", use_container_width=True):
-                    st.info("Email integration coming soon.")
+                    st.info(f"Contact: {applicant['email']}")
         else:
             status_colors = {'APPROVED': 'success', 'REJECTED': 'error'}
             status_func = getattr(st, status_colors.get(moa['status'], 'info'))
             status_func(f"Status: {moa['status']}")
+            
+            if moa['status'] == 'APPROVED':
+                st.info("This MoA has been approved and the applicant has been activated as a scholar.")

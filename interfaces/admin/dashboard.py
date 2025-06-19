@@ -110,7 +110,7 @@ def display_application_trends(analytics, recent_applications):
     
     # Process data for trends
     df = pd.DataFrame(recent_applications)
-    df['applied_at'] = pd.to_datetime(df['applied_at'])
+    df['applied_at'] = pd.to_datetime(df['applied_at'], format='ISO8601')
     df['application_date'] = df['applied_at'].dt.date
     
     # Group by date
@@ -190,7 +190,7 @@ def display_scholar_timeline(scholars):
     
     # Process scholar data
     df = pd.DataFrame(scholars)
-    df['created_at'] = pd.to_datetime(df['created_at'])
+    df['created_at'] = pd.to_datetime(df['created_at'], format='ISO8601')
     df['enrollment_date'] = df['created_at'].dt.date
     
     # Group by date

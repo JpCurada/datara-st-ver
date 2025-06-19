@@ -1,4 +1,4 @@
-# interfaces/scholar/home.py
+# interfaces/scholar/home.py - Enhanced scholar dashboard
 import streamlit as st
 from utils.auth import require_auth, get_current_user, is_approved_applicant
 from utils.db import get_supabase_client
@@ -9,7 +9,6 @@ from typing import Optional
 def scholar_dashboard_page():
     # Check user role and redirect accordingly
     if is_approved_applicant():
-        # Show MoA submission interface for approved applicants
         display_approved_applicant_moa_interface()
         return
     
@@ -22,12 +21,6 @@ def scholar_dashboard_page():
     scholar_id = user['scholar_id']
     partner_org = scholar_data['partner_organizations']['display_name']
     
-    # Check if scholar is active or needs MoA approval
-    if not scholar_data['is_active']:
-        display_scholar_moa_pending_interface(scholar_data, application_data, scholar_id, partner_org)
-        return
-    
-    # Display normal scholar dashboard for active scholars
     display_active_scholar_dashboard(scholar_data, application_data, scholar_id, partner_org)
 
 
@@ -42,7 +35,7 @@ def display_approved_applicant_moa_interface():
     partner_org = applicant_data['partner_organizations']['display_name']
     
     st.title(f"Welcome, {application_data['first_name']}!")
-    st.subheader(f"MoA Submission Required • {partner_org}")
+    st.subheader(f"MoA Submission Required - {partner_org}")
     
     # Status indicator
     col1, col2 = st.columns([2, 1])
@@ -72,12 +65,11 @@ def display_approved_applicant_moa_interface():
     moa_status = get_applicant_moa_status(approved_applicant_id)
     
     if moa_status is None:
-        # Show MoA submission form
         display_moa_submission_form(approved_applicant_id, application_data, partner_org)
     elif moa_status == 'SUBMITTED':
         display_moa_submitted_waiting(approved_applicant_id)
     elif moa_status == 'APPROVED':
-        display_transition_to_scholar(approved_applicant_id)
+        display_transition_to_scholar()
 
 
 def display_moa_submission_form(approved_applicant_id: str, application_data: dict, partner_org: str):
@@ -90,19 +82,36 @@ def display_moa_submission_form(approved_applicant_id: str, application_data: di
         st.subheader("Memorandum of Agreement Terms")
         
         # MoA content
-        moa_content = f"""
-MEMORANDUM OF AGREEMENT - {partner_org} Data Science Scholarship
+        moa_content = f"""MEMORANDUM OF AGREEMENT - {partner_org} Data Science Scholarship
 
 Applicant: {application_data['first_name']} {application_data['last_name']}
 Email: {application_data['email']}
 Approved Applicant ID: {approved_applicant_id}
 
-TERMS: I agree to actively participate in the program, complete coursework, follow community guidelines, and work towards program completion.
+TERMS AND CONDITIONS:
+1. I agree to actively participate in the {partner_org} data science program
+2. I commit to completing assigned coursework and projects
+3. I will follow all community guidelines and code of conduct
+4. I will work towards program completion within the designated timeframe
+5. I understand that failure to participate may result in program termination
 
-BENEFITS: Free access to premium courses, certifications, career support, and scholar community.
-        """
+BENEFITS:
+- Free access to premium {partner_org} courses
+- Industry-recognized certifications
+- Career support and job placement assistance
+- Access to scholar community and networking opportunities
+- Personalized learning paths and mentorship
+
+RESPONSIBILITIES:
+- Regular participation in courses and assignments
+- Professional conduct in all program interactions
+- Honest reporting of progress and challenges
+- Active engagement with the scholar community
+- Commitment to sharing success stories and helping future scholars
+
+By signing below, I acknowledge that I have read, understood, and agree to all terms and conditions outlined in this Memorandum of Agreement."""
         
-        st.text_area("MoA Terms", value=moa_content, height=150, disabled=True)
+        st.text_area("MoA Terms", value=moa_content, height=300, disabled=True)
         
         # Agreement checkboxes
         col1, col2 = st.columns(2)
@@ -132,31 +141,21 @@ BENEFITS: Free access to premium courses, certifications, career support, and sc
             elif not digital_signature.strip():
                 st.error("Please provide your digital signature")
             else:
-                # Submit MoA and create scholar account
-                if submit_moa_and_create_scholar(approved_applicant_id, digital_signature.strip()):
+                # Submit MoA
+                if submit_moa_document(approved_applicant_id, digital_signature.strip()):
                     st.success("MoA submitted successfully!")
                     st.balloons()
-                    st.info("Your scholar account has been created! You'll receive your Scholar ID within 2-3 business days after admin review.")
+                    st.info("Your MoA is now under review. You'll receive an email notification within 2-3 business days.")
                     st.rerun()
                 else:
                     st.error("Failed to submit MoA. Please try again.")
 
 
-def submit_moa_and_create_scholar(approved_applicant_id: str, digital_signature: str) -> bool:
-    """Submit MoA and create scholar account"""
+def submit_moa_document(approved_applicant_id: str, digital_signature: str) -> bool:
+    """Submit MoA document to database"""
     supabase = get_supabase_client()
     
     try:
-        # Get applicant data
-        applicant_response = supabase.table("approved_applicants").select(
-            "application_id, applications!inner(partner_org_id, email, first_name, last_name)"
-        ).eq("approved_applicant_id", approved_applicant_id).execute()
-        
-        if not applicant_response.data:
-            return False
-        
-        applicant_data = applicant_response.data[0]
-        
         # Create MoA submission
         moa_response = supabase.table("moa_submissions").insert({
             "approved_applicant_id": approved_applicant_id,
@@ -164,30 +163,9 @@ def submit_moa_and_create_scholar(approved_applicant_id: str, digital_signature:
             "status": "SUBMITTED"
         }).execute()
         
-        if not moa_response.data:
-            return False
-        
-        moa_id = moa_response.data[0]["moa_id"]
-        
-        # Generate scholar ID and create scholar account
-        scholar_id = generate_scholar_id()
-        
-        supabase.table("scholars").insert({
-            "scholar_id": scholar_id,
-            "moa_id": moa_id,
-            "application_id": applicant_data['application_id'],
-            "partner_org_id": applicant_data['applications']['partner_org_id'],
-            "is_active": False  # Will be activated when admin approves MoA
-        }).execute()
-        
-        # Send notification email
-        send_moa_submission_notification(
-            email=applicant_data['applications']['email'],
-            name=f"{applicant_data['applications']['first_name']} {applicant_data['applications']['last_name']}",
-            scholar_id=scholar_id
-        )
-        
-        return True
+        if moa_response.data:
+            return True
+        return False
         
     except Exception as e:
         st.error(f"Error submitting MoA: {e}")
@@ -209,74 +187,209 @@ def get_applicant_moa_status(approved_applicant_id: str) -> Optional[str]:
         return None
 
 
-def send_moa_submission_notification(email: str, name: str, scholar_id: str):
-    """Send notification that MoA was submitted"""
-    st.info(f"""
-    **Notification Email Sent to {email}:**
-    
-    Subject: MoA Submitted - Your Scholar ID
-    
-    Dear {name},
-    
-    Your MoA has been submitted successfully!
-    
-    **Your Scholar ID:** {scholar_id}
-    
-    You can now login using this Scholar ID instead of your Approved Applicant ID. Your account will be fully activated within 2-3 business days after admin review.
-    
-    Thank you for joining DaTARA!
-    """)
-
-
-# Continue with other display functions...
 def display_moa_submitted_waiting(approved_applicant_id: str):
     """Show waiting status after MoA submission"""
-    st.success("✅ MoA Successfully Submitted")
-    st.info("⏳ Your MoA is under review. Please wait 2-3 business days for approval.")
+    st.success("MoA Successfully Submitted")
+    st.info("Your MoA is under review. Please wait 2-3 business days for approval.")
     
-    # Get scholar ID if available
+    st.write("**What happens next?**")
+    st.write("1. Admin will review your MoA submission")
+    st.write("2. You'll receive an email notification upon approval")
+    st.write("3. Your Scholar ID will be provided in the approval email")
+    st.write("4. You'll gain full access to the program")
+    
+    # Show current MoA details
+    with st.expander("View Submitted MoA"):
+        moa_details = get_moa_details(approved_applicant_id)
+        if moa_details:
+            st.write(f"**Submitted:** {moa_details['submitted_at']}")
+            st.write(f"**Status:** {moa_details['status']}")
+            st.write("**Digital Signature:**")
+            st.code(moa_details['digital_signature'])
+
+
+def get_moa_details(approved_applicant_id: str) -> Optional[dict]:
+    """Get MoA submission details"""
     supabase = get_supabase_client()
-    scholar_response = supabase.table("scholars").select("scholar_id").eq("approved_applicant_id", approved_applicant_id).execute()
     
-    if scholar_response.data:
-        scholar_id = scholar_response.data[0]['scholar_id']
-        st.success(f"🎓 **Your Scholar ID:** `{scholar_id}`")
-        st.info("You can now login using your Scholar ID instead of your Approved Applicant ID.")
+    try:
+        response = supabase.table("moa_submissions").select(
+            "digital_signature, submitted_at, status"
+        ).eq("approved_applicant_id", approved_applicant_id).execute()
+        
+        if response.data:
+            return response.data[0]
+        return None
+        
+    except Exception:
+        return None
 
 
-def display_transition_to_scholar(approved_applicant_id: str):
+def display_transition_to_scholar():
     """Show transition message when becoming scholar"""
-    st.success("🎉 Congratulations! You are now a Scholar!")
+    st.success("Congratulations! You are now a Scholar!")
+    st.info("Your MoA has been approved and you've been granted Scholar status.")
     
-    if st.button("🔄 Continue to Scholar Dashboard", type="primary", use_container_width=True):
+    if st.button("Continue to Scholar Dashboard", type="primary", use_container_width=True):
         st.rerun()
 
 
-def display_scholar_moa_pending_interface(scholar_data, application_data, scholar_id, partner_org):
-    """For scholars whose MoA is not yet approved"""
-    st.title(f"Welcome, {application_data['first_name']}!")
-    st.subheader(f"Scholar Activation Pending • {partner_org}")
-    
-    st.info(f"**Your Scholar ID:** `{scholar_id}`")
-    st.warning("⏳ Your MoA is under admin review. Account activation pending.")
-    
-    # Show progress
-    progress_col1, progress_col2, progress_col3 = st.columns(3)
-    
-    with progress_col1:
-        st.success("✅ 1. Application Approved")
-    
-    with progress_col2:
-        st.success("✅ 2. MoA Submitted")
-    
-    with progress_col3:
-        st.warning("⏳ 3. Scholar Activation")
-    
-    st.info("Please wait 2-3 business days for final approval. You'll receive an email notification when your account is activated.")
-
-
-# The rest of the scholar dashboard functions remain the same...
 def display_active_scholar_dashboard(scholar_data, application_data, scholar_id, partner_org):
     """Regular scholar dashboard for active scholars"""
-    # Implementation remains the same as before
-    pass
+    st.title(f"Welcome back, {application_data['first_name']}!")
+    st.subheader(f"Active Scholar - {partner_org}")
+    
+    # Scholar status card
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.metric("Scholar ID", scholar_id)
+    
+    with col2:
+        st.metric("Status", "Active", delta="Enrolled")
+    
+    with col3:
+        created_date = scholar_data['created_at']
+        st.metric("Member Since", created_date[:10])
+    
+    st.divider()
+    
+    # Dashboard sections
+    dashboard_tabs = st.tabs(["Overview", "Learning Progress", "Certifications", "Profile"])
+    
+    with dashboard_tabs[0]:
+        display_scholar_overview(scholar_data, application_data, partner_org)
+    
+    with dashboard_tabs[1]:
+        display_learning_progress(scholar_id)
+    
+    with dashboard_tabs[2]:
+        display_certifications(scholar_id)
+    
+    with dashboard_tabs[3]:
+        display_scholar_profile(scholar_data, application_data)
+
+
+def display_scholar_overview(scholar_data, application_data, partner_org):
+    """Display scholar overview section"""
+    st.header("Program Overview")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.subheader("Your Benefits")
+        st.write(f"- Free access to {partner_org} premium courses")
+        st.write("- Industry-recognized certifications")
+        st.write("- Career support and job placement")
+        st.write("- Scholar community access")
+        st.write("- Personalized learning paths")
+        st.write("- Mentorship opportunities")
+    
+    with col2:
+        st.subheader("Quick Actions")
+        
+        if st.button("Access Learning Platform", use_container_width=True, type="primary"):
+            st.info(f"You will receive your {partner_org} platform invitation within 1-2 business days.")
+        
+        if st.button("Update Profile", use_container_width=True):
+            st.info("Profile update feature coming soon.")
+        
+        if st.button("Contact Support", use_container_width=True):
+            st.info("Support: support@datara.org")
+    
+    # Recent activity placeholder
+    st.subheader("Recent Activity")
+    st.info("Activity tracking will be available once you start your courses.")
+
+
+def display_learning_progress(scholar_id):
+    """Display learning progress section"""
+    st.header("Learning Progress")
+    
+    # This would typically fetch real data from the learning platform
+    st.info("Course progress tracking will be available once you access the learning platform.")
+    
+    # Placeholder progress
+    st.subheader("Recommended Learning Path")
+    courses = [
+        "Introduction to Data Science",
+        "Python Fundamentals",
+        "Data Manipulation with Pandas",
+        "Data Visualization",
+        "Statistical Analysis",
+        "Machine Learning Basics"
+    ]
+    
+    for i, course in enumerate(courses):
+        if i == 0:
+            st.success(f"{i+1}. {course} - Ready to start")
+        else:
+            st.info(f"{i+1}. {course} - Locked")
+
+
+def display_certifications(scholar_id):
+    """Display certifications section"""
+    st.header("Certifications")
+    
+    # Get actual certifications from database
+    supabase = get_supabase_client()
+    
+    try:
+        response = supabase.table("certifications").select("*").eq("scholar_id", scholar_id).execute()
+        certifications = response.data
+        
+        if certifications:
+            for cert in certifications:
+                with st.expander(f"{cert['name']} - {cert['issuing_organization']}"):
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.write(f"**Issued:** {cert['issue_month']}/{cert['issue_year']}")
+                        if cert.get('expiration_month'):
+                            st.write(f"**Expires:** {cert['expiration_month']}/{cert['expiration_year']}")
+                    with col2:
+                        if cert.get('credential_id'):
+                            st.write(f"**Credential ID:** {cert['credential_id']}")
+                        if cert.get('credential_url'):
+                            st.link_button("View Certificate", cert['credential_url'])
+        else:
+            st.info("No certifications yet. Complete courses to earn certifications!")
+            
+    except Exception as e:
+        st.error(f"Error loading certifications: {e}")
+
+
+def display_scholar_profile(scholar_data, application_data):
+    """Display scholar profile section"""
+    st.header("Profile Information")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.subheader("Personal Information")
+        st.write(f"**Name:** {application_data['first_name']} {application_data['last_name']}")
+        st.write(f"**Email:** {application_data['email']}")
+        st.write(f"**Country:** {application_data['country']}")
+        st.write(f"**Scholar Since:** {scholar_data['created_at'][:10]}")
+    
+    with col2:
+        st.subheader("Academic Background")
+        st.write(f"**Education Status:** {application_data.get('education_status', 'N/A')}")
+        st.write(f"**Institution:** {application_data.get('institution_name', 'N/A')}")
+        st.write(f"**Programming Experience:** {application_data.get('programming_experience', 'N/A')}")
+        st.write(f"**Data Science Experience:** {application_data.get('data_science_experience', 'N/A')}")
+    
+    # Profile actions
+    st.subheader("Profile Actions")
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        if st.button("Update Bio", use_container_width=True):
+            st.info("Bio update feature coming soon.")
+    
+    with col2:
+        if st.button("Upload Photo", use_container_width=True):
+            st.info("Photo upload feature coming soon.")
+    
+    with col3:
+        if st.button("Download Profile", use_container_width=True):
+            st.info("Profile download feature coming soon.")
