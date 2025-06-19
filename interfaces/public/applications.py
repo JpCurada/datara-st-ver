@@ -42,12 +42,12 @@ def public_applications_page():
         st.session_state.otp_verified = False
 
     # Progress bar
-    _, progress_col, _ = st.columns([1, 3, 1])
+    _, progress_col, _ = st.columns([1, 2, 1])
     progress = (st.session_state.step + 1) / len(steps)
     progress_col.progress(progress, text=f"Step {st.session_state.step + 1} of {len(steps)}: {steps[st.session_state.step]}")
     
-    _, step_col, _ = st.columns([1, 3, 1])
-    with step_col:
+    _, step_col, _ = st.columns([1, 2, 1])
+    with step_col.container(border=True):
         step = st.session_state.step
 
         # --- Step 0: Partner Organization & Data Privacy ---
@@ -146,14 +146,6 @@ def public_applications_page():
                     help="You must be at least 16 years old"
                 )
 
-            with age_col:            # Calculate and display age
-                if dob:
-                    today = date.today()
-                    age = today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
-                    st.info(f"Age: {age} years")
-            
-
-            
             col1, col2 = st.columns([1, 1])
             with col1:
                 prev_clicked = st.button("Previous", key="prev1", use_container_width=True)
@@ -201,7 +193,6 @@ def public_applications_page():
             with city_col:
                 city = st.text_input("City *", value=data.get("city", ""), key="city", max_chars=100)
             with postal_col:
-                # Ensure the value is a number; default to 0 if not present
                 postal = st.number_input("Postal/Zip Code *", value=int(data.get("postal", 0)), key="postal")
 
             col1, col2 = st.columns([1, 1])
@@ -378,101 +369,246 @@ def public_applications_page():
         elif step == 6:
             st.subheader(steps[6])
             
-            # Display all form data for review
-            st.write("### Please review your application:")
-            
-            for i, step_name in enumerate(steps[:-1]):  # Exclude current step
-                if step_name in st.session_state.form_data:
-                    st.write(f"**{step_name}:**")
-                    step_data = st.session_state.form_data[step_name]
-                    for key, value in step_data.items():
-                        if isinstance(value, list):
-                            st.write(f"- {key.replace('_', ' ').title()}: {', '.join(value)}")
-                        else:
-                            st.write(f"- {key.replace('_', ' ').title()}: {value}")
-                    st.write("")
-            
-            # Email is not editable in review
-            email = st.session_state.form_data[steps[0]]["email"]
-            st.info(f"Application will be submitted for: {email}")
-            
-            col1, col2 = st.columns([1, 1])
-            with col1:
-                prev_clicked = st.button("Previous", key="prev6", use_container_width=True)
-            with col2:
-                submit_clicked = st.button("Submit Application", key="submit", use_container_width=True, type="primary")
+            # Create tabs for Review and OTP Verification
+            if not st.session_state.get("otp_step", False):
+                # Review Tab
+                st.subheader("Review Your Application")
                 
-            if prev_clicked:
-                st.session_state.step -= 1
-                st.rerun()
+                # Load existing data
+                data_step0 = st.session_state.form_data.get(steps[0], {})
+                data_step1 = st.session_state.form_data.get(steps[1], {})
+                data_step2 = st.session_state.form_data.get(steps[2], {})
+                data_step3 = st.session_state.form_data.get(steps[3], {})
+                data_step4 = st.session_state.form_data.get(steps[4], {})
+                data_step5 = st.session_state.form_data.get(steps[5], {})
                 
-            if submit_clicked:
-                # Get applicant name for email
-                applicant_name = st.session_state.form_data["Basic Information"]["first_name"]
-                
-                # Generate and send OTP
-                otp = str(random.randint(100000, 999999))
-                st.session_state.sent_otp = otp
-                
-                if send_otp_email(email, otp, applicant_name):
-                    st.session_state.otp_step = True
-                    st.session_state.otp_attempts = 0
-                    st.success(f"A 6-digit OTP has been sent to {email}. Please check your email.")
-                    st.rerun()
-                else:
-                    st.error("Failed to send OTP. Please try again.")
-
-        # OTP Verification
-        if st.session_state.get("otp_step", False) and not st.session_state.otp_verified:
-            st.subheader("OTP Verification")
-            
-            entered_otp = st.text_input("Enter the 6-digit OTP sent to your email:", key="otp_input", max_chars=6)
-            
-            col1, col2, col3 = st.columns([1, 1, 1])
-            with col2:
-                verify_clicked = st.button("Verify OTP", key="verify_otp", use_container_width=True)
-            
-            if verify_clicked:
-                stored_otp = st.session_state.get("sent_otp", "")
-                
-                # Debug information (remove in production)
-                st.write(f"Debug - Entered OTP: '{entered_otp}'")
-                st.write(f"Debug - Stored OTP: '{stored_otp}'")
-                st.write(f"Debug - OTP Type: {type(stored_otp)}")
-                
-                # Ensure both are strings and strip whitespace
-                entered_clean = str(entered_otp).strip()
-                stored_clean = str(stored_otp).strip()
-                
-                if entered_clean == stored_clean and stored_clean:
-                    st.session_state.otp_verified = True
+                with st.form("review_form"):
+                    # Partner Organization & Data Privacy (Email not editable)
+                    st.write("**Partner Organization & Data Privacy**")
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        partner_org = st.text_input("Partner Organization", value=data_step0.get("partner_org", ""), disabled=True)
+                    with col2:
+                        email = st.text_input("Email Address", value=data_step0.get("email", ""), disabled=True)
                     
-                    # Save application to database
-                    if save_application_to_database(st.session_state.form_data):
-                        partner_org = st.session_state.form_data[steps[0]]["partner_org"]
-                        st.success(f"You successfully applied to {partner_org}!")
-                        st.info("**Instructions:** Please wait for an email confirmation. We will review your application and get back to you soon.")
+                    st.divider()
+                    
+                    # Basic Information
+                    st.write("**Basic Information**")
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        first_name = st.text_input("First Name", value=data_step1.get("first_name", ""), key="review_fn")
+                    with col2:
+                        middle_name = st.text_input("Middle Name", value=data_step1.get("middle_name", ""), key="review_mn")
+                    with col3:
+                        last_name = st.text_input("Last Name", value=data_step1.get("last_name", ""), key="review_ln")
+                    
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        gender_options = ["MALE", "FEMALE", "OTHER"]
+                        gender_index = gender_options.index(data_step1.get("gender")) if data_step1.get("gender") in gender_options else 0
+                        gender = st.selectbox("Gender", gender_options, index=gender_index, key="review_gender")
+                    with col2:
+                        birthdate = st.date_input("Date of Birth", value=data_step1.get("birthdate"), key="review_dob")
+                    
+                    st.divider()
+                    
+                    # Geographic Details
+                    st.write("**Geographic Details**")
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        country = st.text_input("Country", value=data_step2.get("country", ""), key="review_country")
+                    with col2:
+                        state = st.text_input("State/Region/Province", value=data_step2.get("state", ""), key="review_state")
+                    
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        city = st.text_input("City", value=data_step2.get("city", ""), key="review_city")
+                    with col2:
+                        postal = st.number_input("Postal/Zip Code", value=int(data_step2.get("postal", 0)), key="review_postal")
+                    
+                    st.divider()
+                    
+                    # Education Details
+                    st.write("**Education Details**")
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        education_options = ["CURRENTLY_ENROLLED", "FRESH_GRADUATE", "GRADUATE", "GAP_YEAR"]
+                        education_index = education_options.index(data_step3.get("education_status")) if data_step3.get("education_status") in education_options else 0
+                        education_status = st.selectbox("Education Status", education_options, index=education_index, key="review_education")
+                    with col2:
+                        institution_country = st.text_input("Institution Country", value=data_step3.get("institution_country", ""), key="review_inst_country")
+                    
+                    institution_name = st.text_input("Institution Name", value=data_step3.get("institution_name", ""), key="review_institution")
+                    
+                    st.divider()
+                    
+                    # Interest Details
+                    st.write("**Interest Details**")
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        prog_options = ["NONE", "BEGINNER", "INTERMEDIATE", "ADVANCED"]
+                        prog_index = prog_options.index(data_step4.get("programming_experience")) if data_step4.get("programming_experience") in prog_options else 0
+                        programming_experience = st.selectbox("Programming Experience", prog_options, index=prog_index, key="review_prog")
+                    with col2:
+                        ds_options = ["NONE", "BASIC", "INTERMEDIATE", "ADVANCED"]
+                        ds_index = ds_options.index(data_step4.get("data_science_experience")) if data_step4.get("data_science_experience") in ds_options else 0
+                        data_science_experience = st.selectbox("Data Science Experience", ds_options, index=ds_index, key="review_ds")
+                    
+                    time_options = ["1-2", "3-5", "6-10", "11-15", "16+"]
+                    time_index = time_options.index(data_step4.get("time_commitment")) if data_step4.get("time_commitment") in time_options else 0
+                    time_commitment = st.selectbox("Weekly Time Commitment", time_options, index=time_index, key="review_time")
+                    
+                    why_scholarship = st.text_area("Why do you want this scholarship?", value=data_step4.get("why_scholarship", ""), key="review_why", height=100)
+                    career_goals = st.text_area("Career Goals", value=data_step4.get("career_goals", ""), key="review_goals", height=80)
+                    
+                    st.divider()
+                    
+                    # Demographic and Connectivity
+                    st.write("**Demographic and Connectivity**")
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        demographic_options = ["UNEMPLOYED", "UNDEREMPLOYED", "BELOW_POVERTY", "REFUGEE", "DISABLED", "STUDENT", "WORKING_STUDENT", "NONPROFIT_SCIENTIST"]
+                        demographic = st.multiselect("Demographic Group", demographic_options, default=data_step5.get("demographic", []), key="review_demographic")
+                    with col2:
+                        device_options = ["SMARTPHONE", "LAPTOP", "DESKTOP"]
+                        devices = st.multiselect("Devices", device_options, default=data_step5.get("devices", []), key="review_devices")
+                    with col3:
+                        connectivity_options = ["MOBILE_DATA", "WIFI"]
+                        connectivity = st.multiselect("Internet Connectivity", connectivity_options, default=data_step5.get("connectivity", []), key="review_connectivity")
+                    
+                    # Navigation buttons
+                    col1, col2 = st.columns([1, 1])
+                    with col1:
+                        prev_clicked = st.form_submit_button("Previous", use_container_width=True)
+                    with col2:
+                        can_proceed = (first_name and last_name and gender and birthdate and 
+                                     country and state and city and postal and 
+                                     education_status and institution_country and institution_name and
+                                     programming_experience and data_science_experience and time_commitment and
+                                     why_scholarship and career_goals and demographic and devices and connectivity)
+                        submit_clicked = st.form_submit_button("Submit Application", disabled=not can_proceed, use_container_width=True, type="primary")
+                    
+                    if prev_clicked:
+                        st.session_state.step -= 1
+                        st.rerun()
                         
-                        # Clear form data after successful submission
-                        if st.button("Start New Application"):
-                            for key in list(st.session_state.keys()):
-                                del st.session_state[key]
+                    if submit_clicked:
+                        # Update all form data with reviewed values
+                        st.session_state.form_data[steps[1]] = {
+                            "first_name": first_name,
+                            "middle_name": middle_name,
+                            "last_name": last_name,
+                            "gender": gender,
+                            "birthdate": birthdate
+                        }
+                        st.session_state.form_data[steps[2]] = {
+                            "country": country,
+                            "state": state,
+                            "city": city,
+                            "postal": postal
+                        }
+                        st.session_state.form_data[steps[3]] = {
+                            "education_status": education_status,
+                            "institution_country": institution_country,
+                            "institution_name": institution_name
+                        }
+                        st.session_state.form_data[steps[4]] = {
+                            "programming_experience": programming_experience,
+                            "data_science_experience": data_science_experience,
+                            "time_commitment": time_commitment,
+                            "why_scholarship": why_scholarship,
+                            "career_goals": career_goals
+                        }
+                        st.session_state.form_data[steps[5]] = {
+                            "demographic": demographic,
+                            "devices": devices,
+                            "connectivity": connectivity
+                        }
+                        
+                        # Generate and send OTP
+                        applicant_name = st.session_state.form_data["Basic Information"]["first_name"]
+                        email = st.session_state.form_data[steps[0]]["email"]
+                        otp = str(random.randint(100000, 999999))
+                        st.session_state.sent_otp = otp
+                        
+                        if send_otp_email(email, otp, applicant_name):
+                            st.session_state.otp_step = True
+                            st.session_state.otp_attempts = 0
+                            st.success(f"A 6-digit OTP has been sent to {email}. Please check your email.")
                             st.rerun()
-                    else:
-                        st.error("Failed to save application. Please try again.")
-                else:
-                    st.session_state.otp_attempts += 1
-                    if st.session_state.otp_attempts >= 3:
-                        st.error("Too many failed attempts. Please restart the application process.")
-                        if st.button("Restart Application"):
-                            for key in list(st.session_state.keys()):
-                                del st.session_state[key]
-                            st.rerun()
-                    else:
-                        remaining = 3 - st.session_state.otp_attempts
-                        st.error(f"Invalid OTP. {remaining} attempts remaining.")
-                        # Show what was compared for debugging
-                        if stored_clean:
-                            st.error(f"Expected: {stored_clean}, Got: {entered_clean}")
                         else:
-                            st.error("No OTP found in session. Please request a new OTP.")
+                            st.error("Failed to send OTP. Please try again.")
+            
+            else:
+                # OTP Verification Tab
+                st.subheader("Email Verification")
+                
+                email = st.session_state.form_data[steps[0]]["email"]
+                st.info(f"We've sent a 6-digit verification code to {email}")
+                
+                col1, col2, col3 = st.columns([1, 2, 1])
+                with col2:
+                    entered_otp = st.text_input(
+                        "Enter verification code:",
+                        key="otp_input",
+                        max_chars=6,
+                        placeholder="123456",
+                        help="Check your email for the 6-digit code"
+                    )
+                    
+                    verify_clicked = st.button("Verify Code", key="verify_otp", use_container_width=True, type="primary")
+                    
+                
+                # Navigation buttons outside the column structure
+                st.write("")  # Add some spacing
+                
+                col_back, col_resend = st.columns(2)
+                with col_back:
+                    if st.button("Back to Review", use_container_width=True):
+                        st.session_state.otp_step = False
+                        st.rerun()
+                with col_resend:
+                    if st.button("Resend Code", use_container_width=True):
+                        applicant_name = st.session_state.form_data["Basic Information"]["first_name"]
+                        otp = str(random.randint(100000, 999999))
+                        st.session_state.sent_otp = otp
+                        if send_otp_email(email, otp, applicant_name):
+                            st.success("New code sent to your email!")
+                        else:
+                            st.error("Failed to send code. Please try again.")
+                
+                if verify_clicked:
+                    stored_otp = st.session_state.get("sent_otp", "")
+                    entered_clean = str(entered_otp).strip()
+                    stored_clean = str(stored_otp).strip()
+                    
+                    if entered_clean == stored_clean and stored_clean:
+                        st.session_state.otp_verified = True
+                        
+                        # Save application to database
+                        if save_application_to_database(st.session_state.form_data):
+                            partner_org = st.session_state.form_data[steps[0]]["partner_org"]
+                            st.success(f"Application submitted successfully to {partner_org}!")
+                            st.balloons()
+                            st.info("You will receive an email confirmation shortly. We will review your application and contact you within 2-3 business days.")
+                            
+                            # Clear form data after successful submission
+                            if st.button("Submit Another Application", use_container_width=True):
+                                for key in list(st.session_state.keys()):
+                                    del st.session_state[key]
+                                st.rerun()
+                        else:
+                            st.error("Failed to save application. Please try again.")
+                    else:
+                        st.session_state.otp_attempts = st.session_state.get("otp_attempts", 0) + 1
+                        if st.session_state.otp_attempts >= 3:
+                            st.error("Too many failed attempts. Please restart the application process.")
+                            if st.button("Restart Application", use_container_width=True):
+                                for key in list(st.session_state.keys()):
+                                    del st.session_state[key]
+                                st.rerun()
+                        else:
+                            remaining = 3 - st.session_state.otp_attempts
+                            st.error(f"Invalid verification code. {remaining} attempts remaining.")
+                            st.warning("Please check your email and enter the correct 6-digit code.")

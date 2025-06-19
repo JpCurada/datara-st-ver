@@ -14,12 +14,13 @@ def public_scholar_login_page():
             st.success("Already logged in as approved applicant!")
             return
 
-    st.title("Scholar & Approved Applicant Login")
 
-    login_col, _, info_col = st.columns([2, 1, 2])
-    
+    _,login_col, info_col, _ = st.columns([1,2, 3, 1], gap="medium")
+
     with login_col:
-        with st.form("scholar_login_form", clear_on_submit=False):
+        with st.form("scholar_login_form", clear_on_submit=False, border=True):
+            st.title("Scholar & Approved Applicant Login")
+
             scholar_id = st.text_input(
                 "DaTARA ID", 
                 placeholder="SCH12345678 or APP12345678",
@@ -56,8 +57,7 @@ def public_scholar_login_page():
                         else:
                             st.error("Invalid credentials. Please check your ID, email, and birth date.")
 
-    with info_col:
-        st.info("**Scholar & Approved Applicant Login**")
+    with info_col.container(border=False):
         st.write("""
         **To access your account:**
         1. Enter your DaTARA ID (Scholar or Approved Applicant)
@@ -74,7 +74,9 @@ def public_scholar_login_page():
         - Apply through the Applications page if you haven't yet
         """)
         
-        with st.expander("Forgot your ID?"):
+        forget_col, need_help_col = st.columns([1, 1])
+
+        with forget_col.expander("Forgot your ID?"):
             st.write("""
             **If you can't find your ID:**
             - Check your email inbox for "DaTARA Application Approved"
@@ -86,7 +88,7 @@ def public_scholar_login_page():
             - Approved Applicant ID: APP followed by 8 digits
             """)
         
-        with st.expander("Need Help?"):
+        with need_help_col.expander("Need Help?"):
             st.write("""
             **Common Issues:**
             - Make sure to use the exact email from your application

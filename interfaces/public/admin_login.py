@@ -8,11 +8,13 @@ def org_admin_login():
         st.success("Already logged in as admin!")
         return
 
-    st.title("Admin Login")
-
-    _, login_col, _ = st.columns([1, 3, 1])
+    _, login_col, _ = st.columns([1, 1, 1])
+    
     with login_col:
         with st.form("admin_login_form"):
+            st.title("Admin Login")
+            st.info("💡 **Admin accounts** are created by DataCamp system administrators and linked to partner organizations.")
+
             email = st.text_input("Email")
             password = st.text_input("Password", type="password")
             submit = st.form_submit_button("Login", use_container_width=True)
@@ -33,8 +35,6 @@ def org_admin_login():
                 else:
                     st.error("Invalid credentials or account not found in admin records.")
 
-        st.divider()
-        st.info("💡 **Admin accounts** are created by system administrators and linked to partner organizations.")
         
         with st.expander("Need help?"):
             st.write("""

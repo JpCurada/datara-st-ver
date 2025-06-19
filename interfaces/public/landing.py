@@ -17,7 +17,7 @@ def public_home_page():
         <h1 style="font-size: 3.5rem; font-weight: 600; margin-bottom: 1rem;">
             Welcome to DaTARA
         </h1>
-        <h2 style="font-size: 1.8rem; color: #666; font-weight: 300; margin-bottom: 2rem;">
+        <h2 style="font-size: 1.8rem; color: #666; font-weight: 400; margin-bottom: 2rem;">
             Data Science Education for All
         </h2>
         <p style="font-size: 1.2rem; max-width: 800px; margin: 0 auto; line-height: 1.6;">
@@ -35,12 +35,9 @@ def public_home_page():
         
     st.markdown("<br>", unsafe_allow_html=True)
     
-    # Program Overview
-    st.header("Program Overview")
-    
     overview_col1, overview_col2, overview_col3 = st.columns(3)
     
-    with overview_col1:
+    with overview_col1.container(border=True, height=350):
         st.markdown("""
         ### **Our Mission**
         
@@ -55,7 +52,7 @@ def public_home_page():
         - Refugees and displaced persons
         """)
     
-    with overview_col2:
+    with overview_col2.container(border=True, height=350):
         st.markdown("""
         ### **What You Get**
         
@@ -68,7 +65,7 @@ def public_home_page():
         - Mentorship opportunities
         """)
     
-    with overview_col3:
+    with overview_col3.container(border=True, height=350):
         st.markdown("""
         ### **Success Path**
         
@@ -116,7 +113,7 @@ def public_home_page():
     with stats_col1:
         st.metric(
             label="Scholars Graduated",
-            value="2,500+",
+            value="2,400+",
             help="Total number of program graduates"
         )
     
@@ -250,7 +247,7 @@ def public_home_page():
     
     story_col1, story_col2 = st.columns(2)
     
-    with story_col1:
+    with story_col1.container(border=True, height=400):
         st.markdown("""
         ### **Maria Rodriguez - Data Analyst**
         *Philippines → Tech Company, Singapore*
@@ -265,7 +262,7 @@ def public_home_page():
         - Outcome: Data Analyst at major tech firm
         """)
     
-    with story_col2:
+    with story_col2.container(border=True, height=400):
         st.markdown("""
         ### **James Wilson - ML Engineer**
         *Kenya → Fintech Startup, Remote*
@@ -279,54 +276,6 @@ def public_home_page():
         - Outcome: ML Engineer, remote position
         """)
     
-    # FAQ Section
-    st.header("Frequently Asked Questions")
-    
-    faq_tabs = st.tabs(["Application", "Cost", "Time", "Requirements"])
-    
-    with faq_tabs[0]:
-        st.markdown("""
-        **Q: Who is eligible to apply?**
-        A: Individuals from underrepresented communities, including students, unemployed, underemployed, refugees, disabled persons, and those from developing regions.
-        
-        **Q: Can I study part-time?**
-        A: Yes! The program is designed to be flexible around your schedule.
-        
-        **Q: What's the time commitment?**
-        A: Most scholars dedicate 6-15 hours per week, but you can go at your own pace.
-        
-        **Q: Is there a deadline to complete?**
-        A: No strict deadlines, but we encourage consistent progress for best results.
-        """)
-    
-    with faq_tabs[3]:
-        st.markdown("""
-        **Q: Do I need prior programming experience?**
-        A: No! We welcome complete beginners and provide foundational courses.
-        
-        **Q: What technical requirements do I need?**
-        A: Internet connection and a device (computer, tablet, or smartphone).
-        
-        **Q: What if English isn't my first language?**
-        A: Many courses include subtitles and we have multilingual community support.
-        """)
-    
-    # Call-to-Action Footer
-    st.markdown("---")
-    
-    cta_footer_col1, cta_footer_col2, cta_footer_col3 = st.columns([1, 2, 1])
-    
-    with cta_footer_col2:
-        st.markdown("""
-        <div style="text-align: center; padding: 2rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 15px; color: white;">
-            <h2 style="color: white; margin-bottom: 1rem;">Ready to Start Your Data Science Journey?</h2>
-            <p style="font-size: 1.1rem; margin-bottom: 2rem; color: #f0f0f0;">
-                Join thousands of scholars who have transformed their careers through data science education.
-            </p>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        st.markdown("<br>", unsafe_allow_html=True)
                 
     # Contact Information
     st.markdown("---")
