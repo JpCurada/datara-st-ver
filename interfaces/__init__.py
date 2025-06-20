@@ -7,5 +7,5 @@ from interfaces.admin.applications_view import admin_applications_page
 from interfaces.admin.scholar_view import admin_scholars_page
 from interfaces.admin.moa_view import admin_moa_page
 from interfaces.scholar.home import scholar_dashboard_page
-
-
+from interfaces.scholar.scholar_profile import scholar_profile_page
+from interfaces.scholar.help import scholar_help_page

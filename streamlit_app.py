@@ -38,6 +38,8 @@ admin_moa = st.Page(page=pg.admin_moa_page, title='MoA Records')
 
 # Scholar Pages (handles both scholars and approved applicants)
 scholar_dashboard = st.Page(page=pg.scholar_dashboard_page, title='Dashboard')
+scholar_profile = st.Page(page=pg.scholar_profile_page, title='Profile')
+scholar_help = st.Page(page=pg.scholar_help_page, title='Help')
 
 # Main navigation logic
 if not is_authenticated():
@@ -159,12 +161,12 @@ elif is_scholar() or is_approved_applicant():
         partner_org = applicant_data['partner_organizations']['display_name']
     
     pg_nav = st.navigation({
-        f"Scholar Portal": [scholar_dashboard]
+        f"Scholar Portal": [scholar_dashboard, scholar_profile, scholar_help]
     })
     
     # Scholar header with info and navigation
     with st.container():
-        scholar_header_col1, scholar_header_col2, scholar_header_col3 = st.columns([2, 2, 2])
+        scholar_header_col1, scholar_header_col2, scholar_header_col3 = st.columns([1, 2, 2])
         
         with scholar_header_col1:
             st.markdown(f"### Welcome, **{scholar_name}**")
@@ -188,21 +190,26 @@ elif is_scholar() or is_approved_applicant():
                 
                 with scholar_nav[1]:
                     if st.button("Profile", use_container_width=True):
-                        st.info("Profile page coming soon!")
-                
+                        st.switch_page(scholar_profile)
+
                 with scholar_nav[2]:
-                    if st.button("Learning", use_container_width=True):
+                    if st.button("Help", use_container_width=True):
                         if is_scholar():
-                            st.info("Learning portal coming soon!")
+                            st.switch_page(scholar_help)
                         else:
                             st.info("Available after MoA approval")
                 
                 with scholar_nav[3]:
-                    if st.button("Logout", use_container_width=True, type="secondary"):
-                        logout()
-                        st.success("Logged out successfully!")
-                        st.rerun()
-        
+                    with st.popover("Logout"):
+                        st.write("Are you sure you want to log out?")
+                        
+                        if st.button("Cancel", key="logout_cancel", use_container_width=True):
+                            st.toast("Logout cancelled.")
+                        
+                        if st.button("Confirm Logout", key="logout_confirm", type="primary", use_container_width=True):
+                            logout()
+                            st.success("Logged out successfully!")
+                            st.rerun()
         st.divider()
 
 # Add a footer with system information
