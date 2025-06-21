@@ -254,9 +254,6 @@ def display_active_scholar_dashboard(scholar_data, application_data, scholar_id,
     
     st.divider()
     
-    # Simple placeholder message
-    st.info("🚀 Your scholar dashboard is being enhanced! Check back soon for new features.")
-    
     # Basic scholar benefits info
     st.subheader("Your Scholar Benefits")
     col1, col2 = st.columns(2)
@@ -273,3 +270,76 @@ def display_active_scholar_dashboard(scholar_data, application_data, scholar_id,
     
     # Contact info
     st.info(f"You will receive your {partner_org} platform invitation within 1-2 business days. For support, contact: support@datara.org")
+
+    # Scholar certification feed
+    st.divider()
+    st.subheader("Recent Scholar Certifications")
+    display_scholar_cert_feed(scholar_id)
+
+
+def display_scholar_cert_feed(current_scholar_id):
+    """Show a feed of recent certifications from all scholars except the current user, in 3 columns per row."""
+    supabase = get_supabase_client()
+    try:
+        response = supabase.table("certifications").select(
+            """
+            name, issuing_organization, issue_month, issue_year, credential_url, scholar_id,
+            scholars!inner(
+                application_id,
+                applications!inner(first_name, last_name)
+            )
+            """
+        ).order("created_at", desc=True).limit(30).execute()  # Fetch more for more rows
+        certs = response.data
+
+        if not certs:
+            st.info("No recent certifications from other scholars yet.")
+            return
+
+        # Create margin and content columns (just like scholar_profile.py)
+        _, left_col, _, right_col, _ = st.columns([0.03, 0.8, 0.08, 0.8, 0.03])
+
+        # Use left_col and right_col for your two feed columns
+        with left_col:
+            # First column of certifications
+            for i, cert in enumerate(certs):
+                if i % 2 == 0 and cert["scholar_id"] != current_scholar_id:
+                    scholar = cert.get("scholars", {})
+                    application = scholar.get("applications", {})
+                    full_name = f"{application.get('first_name', '')} {application.get('last_name', '')}".strip()
+                    st.markdown(
+                        f'<div class="cert-feed-post">'
+                        f'<div class="cert-feed-header"><b>{full_name} just posted a new certification!</b></div>'
+                        f'<div class="cert-feed-body">'
+                        f'Certification: <b>{cert["name"]}</b><br>'
+                        f'Issued by: {cert["issuing_organization"]}<br>'
+                        f'Issued at: {cert["issue_month"]}/{cert["issue_year"]}'
+                        f'</div>',
+                        unsafe_allow_html=True
+                    )
+                    if cert.get("credential_url"):
+                        st.link_button("View", cert["credential_url"], use_container_width=True)
+                    st.markdown('</div>', unsafe_allow_html=True)
+
+        with right_col:
+            # Second column of certifications
+            for i, cert in enumerate(certs):
+                if i % 2 == 1 and cert["scholar_id"] != current_scholar_id:
+                    scholar = cert.get("scholars", {})
+                    application = scholar.get("applications", {})
+                    full_name = f"{application.get('first_name', '')} {application.get('last_name', '')}".strip()
+                    st.markdown(
+                        f'<div class="cert-feed-post">'
+                        f'<div class="cert-feed-header"><b>{full_name} just posted a new certification!</b></div>'
+                        f'<div class="cert-feed-body">'
+                        f'Certification: <b>{cert["name"]}</b><br>'
+                        f'Issued by: {cert["issuing_organization"]}<br>'
+                        f'Issued at: {cert["issue_month"]}/{cert["issue_year"]}'
+                        f'</div>',
+                        unsafe_allow_html=True
+                    )
+                    if cert.get("credential_url"):
+                        st.link_button("View", cert["credential_url"], use_container_width=True)
+                    st.markdown('</div>', unsafe_allow_html=True)
+    except Exception as e:
+        st.error(f"Error loading certification feed: {e}")
