@@ -231,9 +231,14 @@ def approved_applicant_login_auth(approved_applicant_id: str, email: str, birth_
     try:
         # Fixed query: Use proper table relationships
         response = supabase.table("approved_applicants").select(
-            "approved_applicant_id, application_id, created_at, "
-            "applications!inner(email, birthdate, first_name, last_name, country, education_status, institution_name, institution_country, state_region_province, city, postal_code), "  # Add empty fields in needed
-            "partner_organizations!inner(display_name))"
+            """
+            approved_applicant_id, application_id, created_at,
+            applications!inner(
+                email, birthdate, first_name, last_name, country, education_status, institution_name, institution_country, state_region_province, city, postal_code,
+                partner_org_id,
+                partner_organizations!inner(display_name)
+            )
+            """
         ).eq("approved_applicant_id", approved_applicant_id).execute()
         
         if response.data:

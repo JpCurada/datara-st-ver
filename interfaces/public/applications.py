@@ -223,37 +223,75 @@ def public_applications_page():
         # --- Step 3: Education Details ---
         elif step == 3:
             data = st.session_state.form_data.get(steps[3], {})
-            
             st.subheader(steps[3])
-            
+
             education_status_options = ["CURRENTLY_ENROLLED", "FRESH_GRADUATE", "GRADUATE", "GAP_YEAR"]
             education_status_index = education_status_options.index(data.get("education_status")) if data.get("education_status") in education_status_options else None
             education_status = st.selectbox("Education Status *", education_status_options, index=education_status_index, key="education_status")
-            
-            institution_country = st.text_input("Institution/University Country *", value=data.get("institution_country", ""), key="institution_country", max_chars=100)
-            
-            # Fetch universities when country is provided
-            institution_name = None
+
+            # --- Institution Country Dropdown ---
+            countries = get_countries()
+            current_institution_country = data.get("institution_country", "")
+            institution_country_index = countries.index(current_institution_country) if current_institution_country in countries else 0
+            institution_country = st.selectbox(
+                "Institution/University Country *",
+                options=countries,
+                index=institution_country_index,
+                key="institution_country"
+            )
+
+            # --- University/Institution Dropdown or Manual Input ---
+            institution_name = ""
             if institution_country:
                 with st.spinner("Loading universities..."):
                     universities = get_universities_by_country(institution_country)
-                
-                # Allow manual input if API fails
-                if "API unavailable" in universities[0] or "University not found" in universities[0]:
-                    institution_name = st.text_input("Institution Name *", value=data.get("institution_name", ""), key="institution_name")
+                # Check if API returned valid universities or error messages
+                if (universities and len(universities) > 0 and
+                    not any(error_msg in universities[0] for error_msg in [
+                        "API unavailable", "University not found", "No universities found",
+                        "Please type manually", "timed out", "No internet connection", "API error"
+                    ])):
+                    # Use dropdown when universities are available
+                    current_institution = data.get("institution_name", "")
+                    institution_index = universities.index(current_institution) if current_institution in universities else 0
+                    selected_university = st.selectbox(
+                        "Institution Name *",
+                        options=universities,
+                        index=institution_index,
+                        key="institution_name_dropdown"
+                    )
+                    if selected_university == "Type manually...":
+                        institution_name = st.text_input(
+                            "Enter University Name",
+                            value=current_institution if current_institution else "",
+                            key="institution_name_manual"
+                        )
+                    else:
+                        institution_name = selected_university
                 else:
-                    institution_index = universities.index(data.get("institution_name")) if data.get("institution_name") in universities else None
-                    institution_name = st.selectbox("Institution Name *", universities, index=institution_index, key="institution_name")
+                    st.info("University lookup unavailable. Please enter manually.")
+                    institution_name = st.text_input(
+                        "Institution Name *",
+                        value=data.get("institution_name", ""),
+                        key="institution_name_text"
+                    )
             else:
-                st.info("Please enter the institution/university country first to load available institutions.")
-            
+                st.info("Please select the institution/university country first to load available institutions.")
+                institution_name = st.text_input(
+                    "Institution Name *",
+                    value="",
+                    disabled=True,
+                    key="institution_name_disabled"
+                )
+
+            # --- Navigation Buttons ---
             col1, col2 = st.columns([1, 1])
             with col1:
                 prev_clicked = st.button("Previous", key="prev3", use_container_width=True)
             with col2:
                 can_proceed = education_status and institution_country and institution_name
                 next_clicked = st.button("Next", key="next3", disabled=not can_proceed, use_container_width=True)
-                
+
             if prev_clicked:
                 st.session_state.form_data[steps[3]] = {
                     "education_status": education_status,
@@ -262,7 +300,7 @@ def public_applications_page():
                 }
                 st.session_state.step -= 1
                 st.rerun()
-                
+
             if next_clicked:
                 st.session_state.form_data[steps[3]] = {
                     "education_status": education_status,
