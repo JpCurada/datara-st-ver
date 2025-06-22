@@ -958,8 +958,8 @@ def get_moa_submissions_for_admin(partner_org_id: str) -> List[Dict[str, Any]]:
         # Fixed query with correct table relationships
         response = supabase.table("moa_submissions").select(
             "moa_id, submitted_at, status, digital_signature, "
-            "approved_applicants!inner(application_id, "
-            "applications!inner(first_name, last_name, email, partner_org_id, country))"
+            "approved_applicants!inner(approved_applicant_id, "
+            "applications!inner(application_id, first_name, last_name, email, partner_org_id, country))"
         ).execute()
         
         # Filter by partner org
