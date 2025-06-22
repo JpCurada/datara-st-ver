@@ -11,316 +11,226 @@ scholar_login_page = os.path.join(parent_dir, "interfaces", "public", "scholar_l
 def public_home_page():
     """Enhanced landing page for DaTARA platform"""
     
-    # Hero Section
-    st.markdown("""
-    <div style="text-align: center; padding: 2rem 0;">
-        <h1 style="font-size: 3.5rem; font-weight: 600; margin-bottom: 1rem;">
-            Welcome to DaTARA
-        </h1>
-        <h2 style="font-size: 1.8rem; color: #666; font-weight: 400; margin-bottom: 2rem;">
-            Data Science Education for All
-        </h2>
-        <p style="font-size: 1.2rem; max-width: 800px; margin: 0 auto; line-height: 1.6;">
-            Empowering underrepresented communities through free, high-quality data science education 
-            and certification programs from leading industry partners.
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Call-to-Action Buttons
-    cta_col1, cta_col2, cta_col3 = st.columns([1, 2, 1])
-    
-    with cta_col2:
-        button_col1, button_col2 = st.columns(2)
-        
-    st.markdown("<br>", unsafe_allow_html=True)
-    
-    overview_col1, overview_col2, overview_col3 = st.columns(3)
-    
-    with overview_col1.container(border=True, height=350):
+    # Hero Section with CTA
+    with st.container(key="landing-hero"):
         st.markdown("""
-        ### **Our Mission**
+        <div style="text-align: center; padding: 1.5rem 0;">
+            <h1 style="font-size: 3.2rem; font-weight: 700; margin-bottom: 0.8rem; color: white;">
+                Welcome to DaTARA
+            </h1>
+            <h2 style="font-size: 1.4rem; color: rgba(255,255,255,0.9); font-weight: 400; margin-bottom: 1.5rem;">
+                Data Science Education for All
+            </h2>
+            <p style="font-size: 1.1rem; max-width: 700px; margin: 0 auto 2rem auto; line-height: 1.5; color: rgba(255,255,255,0.8);">
+                Empowering underrepresented communities through free, high-quality data science education and certification programs.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
         
-        To bridge the digital divide by providing free, world-class data science education 
-        to underrepresented communities worldwide.
+            # Key Features Overview - Compact
+    with st.container(key="landing-features"):
+        feature_col1, feature_col2, feature_col3 = st.columns(3, gap="medium")
         
-        **Who We Serve:**
-        - Students and recent graduates
-        - Unemployed and underemployed individuals  
-        - People from developing regions
-        - Disabled individuals
-        - Refugees and displaced persons
-        """)
+        with feature_col1:
+            with st.container(key="feature-mission"):
+                st.markdown("""
+                <div style="text-align: center;">
+                    <h3 style="color: #041b2b; font-weight: 700; margin-bottom: 1.5rem; font-size: 1.4rem;">Our Mission</h3>
+                    <p style="font-size: 1rem; line-height: 1.6; color: #555; font-weight: 400;">
+                        Bridge the digital divide through world-class data science education for underrepresented communities worldwide. We believe everyone deserves access to quality education.
+                    </p>
+                </div>
+                """, unsafe_allow_html=True)
+        
+        with feature_col2:
+            with st.container(key="feature-benefits"):
+                st.markdown("""
+                <div style="text-align: center;">
+                    <h3 style="color: #041b2b; font-weight: 700; margin-bottom: 1.5rem; font-size: 1.4rem;">What You Get</h3>
+                    <p style="font-size: 1rem; line-height: 1.6; color: #555; font-weight: 400;">
+                        Premium courses, industry certifications, mentorship, career support, and access to our global scholar community. Everything you need to succeed in data science.
+                    </p>
+                </div>
+                """, unsafe_allow_html=True)
+        
+        with feature_col3:
+            with st.container(key="feature-journey"):
+                st.markdown("""
+                <div style="text-align: center;">
+                    <h3 style="color: #041b2b; font-weight: 700; margin-bottom: 1.5rem; font-size: 1.4rem;">Your Journey</h3>
+                    <p style="font-size: 1rem; line-height: 1.6; color: #555; font-weight: 400;">
+                        Apply → Get Approved → Sign MoA → Learn & Grow → Get Certified → Land Your Dream Job. A clear path to success.
+                    </p>
+                </div>
+                """, unsafe_allow_html=True)
     
-    with overview_col2.container(border=True, height=350):
+    # Impact Statistics
+    with st.container(key="landing-stats"):
         st.markdown("""
-        ### **What You Get**
+        <div style="text-align: center; margin: 2rem 0 1rem 0;">
+            <h2 style="color: #041b2b; font-weight: 600; margin-bottom: 1.5rem;">Program Impact</h2>
+        </div>
+        """, unsafe_allow_html=True)
         
-        **Free Access To:**
-        - Premium courses and learning materials
-        - Industry-recognized certifications
-        - Exclusive scholar community
-        - Career support and job placement
-        - Personalized learning paths
-        - Mentorship opportunities
-        """)
+        stats_col1, stats_col2, stats_col3, stats_col4 = st.columns(4)
+        
+        with stats_col1:
+            with st.container(key="stat-graduates"):
+                st.metric(
+                    label="Scholars Graduated",
+                    value="2,400+",
+                    help="Total program graduates"
+                )
+        
+        with stats_col2:
+            with st.container(key="stat-certifications"):
+                st.metric(
+                    label="Certifications",
+                    value="8,200+",
+                    help="Industry certifications earned"
+                )
+        
+        with stats_col3:
+            with st.container(key="stat-placements"):
+                st.metric(
+                    label="Job Placements",
+                    value="1,800+",
+                    help="Scholars employed"
+                )
+        
+        with stats_col4:
+            with st.container(key="stat-countries"):
+                st.metric(
+                    label="Countries",
+                    value="75+",
+                    help="Global reach"
+                )
     
-    with overview_col3.container(border=True, height=350):
+    # Partner Organizations with Images
+    with st.container(key="landing-partners"):
         st.markdown("""
-        ### **Success Path**
+        <div style="text-align: center; margin: 2rem 0 1rem 0;">
+            <h2 style="color: #041b2b; font-weight: 600; margin-bottom: 0.5rem;">Our Partner Organizations</h2>
+            <p style="color: #666; font-size: 1rem;">Leading organizations in data science education</p>
+        </div>
+        """, unsafe_allow_html=True)
         
-        **Your Journey:**
-        1. **Apply** - Submit your application
-        2. **Get Approved** - Wait for review
-        3. **Sign MoA** - Complete agreement
-        4. **Become Scholar** - Start learning
-        5. **Learn & Grow** - Complete courses
-        6. **Get Certified** - Earn credentials
-        7. **Land Job** - Career success!
-        """)
-    
-    # Partner Organizations Section
-    st.header("Our Partner Organizations")
-    
-    try:
-        partner_orgs = get_active_partner_organizations()
-        
-        if partner_orgs:
-            st.write("We're proud to partner with leading organizations in data science education:")
+        try:
+            partner_orgs = get_active_partner_organizations()
             
-            # Display partners in a grid
-            partner_cols = st.columns(len(partner_orgs))
-            
-            for i, org in enumerate(partner_orgs):
-                with partner_cols[i]:
+            if partner_orgs and len(partner_orgs) > 0:
+                # Display partner logos in a grid
+                partner_cols = st.columns(min(len(partner_orgs), 4), gap="medium")
+                
+                for i, org in enumerate(partner_orgs[:4]):  # Limit to 4 partners
+                    with partner_cols[i]:
+                        with st.container(key=f"partner-{i}"):
+                            st.markdown(f"""
+                            <div style="text-align: center;">
+                                <div style="width: 80px; height: 80px; background: linear-gradient(135deg, #07e966, #02ef61); border-radius: 50%; margin: 0 auto 1rem auto; display: flex; align-items: center; justify-content: center;">
+                                    <span style="color: white; font-size: 1.5rem; font-weight: bold;">{org[0]}</span>
+                                </div>
+                                <h4 style="color: #07e966; margin-bottom: 0.5rem; font-size: 1.1rem; font-weight: 600;">{org}</h4>
+                                <p style="color: rgba(255, 255, 255, 0.8); font-size: 0.9rem; margin: 0;">Premium Data Science</p>
+                            </div>
+                            """, unsafe_allow_html=True)
+            else:
+                # Placeholder partner logos
+                placeholder_partners = ["DataCamp", "Coursera", "Kaggle", "EdX"]
+                partner_cols = st.columns(4, gap="medium")
+                
+                for i, partner in enumerate(placeholder_partners):
+                    with partner_cols[i]:
+                        with st.container(key=f"partner-placeholder-{i}"):
+                            st.markdown(f"""
+                            <div style="text-align: center;">
+                                <div style="width: 80px; height: 80px; background: linear-gradient(135deg, #07e966, #02ef61); border-radius: 50%; margin: 0 auto 1rem auto; display: flex; align-items: center; justify-content: center;">
+                                    <span style="color: white; font-size: 1.5rem; font-weight: bold;">{partner[0]}</span>
+                                </div>
+                                <h4 style="color: #07e966; margin-bottom: 0.5rem; font-size: 1.1rem; font-weight: 600;">{partner}</h4>
+                                <p style="color: rgba(255, 255, 255, 0.8); font-size: 0.9rem; margin: 0;">Premium Courses</p>
+                            </div>
+                            """, unsafe_allow_html=True)
+                
+        except Exception as e:
+            st.info("Loading partner organization information...")
+    
+    # How It Works - Streamlined
+    with st.container(key="landing-process"):
+        st.markdown("""
+        <div style="text-align: center; margin: 2rem 0 1rem 0;">
+            <h2 style="color: #041b2b; font-weight: 600; margin-bottom: 1.5rem;">How It Works</h2>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        process_col1, process_col2, process_col3, process_col4 = st.columns(4)
+        
+        steps = [
+            ("1", "Apply", "Submit your application with required information and eligibility details"),
+            ("2", "Review", "Partner organization reviews your application within 2-3 business days"),
+            ("3", "Agreement", "Sign the Memorandum of Agreement and become an approved scholar"),
+            ("4", "Learn", "Start your learning journey with premium courses and certifications")
+        ]
+        
+        for i, (step_num, title, desc) in enumerate(steps):
+            with [process_col1, process_col2, process_col3, process_col4][i]:
+                with st.container(key=f"process-step-{i}"):
                     st.markdown(f"""
-                    <div style="text-align: center; padding: 1rem; border: 2px solid #e0e0e0; border-radius: 10px; margin: 0.5rem;">
-                        <h3 style="color: #4CAF50;">{org}</h3>
-                        <p>Premium Data Science Courses</p>
+                    <div style="text-align: center;">
+                        <div style="width: 50px; height: 50px; background: linear-gradient(135deg, #07e966, #02ef61); color: white; border-radius: 50%; margin: 0 auto 1.5rem auto; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; font-weight: 700; box-shadow: 0 4px 15px rgba(7, 233, 102, 0.3);">
+                            {step_num}
+                        </div>
+                        <h4 style="color: #041b2b; margin-bottom: 1rem; font-weight: 600; font-size: 1.2rem;">{title}</h4>
+                        <p style="color: #666; font-size: 0.95rem; line-height: 1.5; margin: 0;">{desc}</p>
                     </div>
                     """, unsafe_allow_html=True)
-        else:
-            st.info("Partner organizations information will be displayed here.")
-            
-    except Exception as e:
-        st.info("Loading partner organization information...")
     
-    # Statistics Section
-    st.header("Program Impact")
-    
-    stats_col1, stats_col2, stats_col3, stats_col4 = st.columns(4)
-    
-    with stats_col1:
-        st.metric(
-            label="Scholars Graduated",
-            value="2,400+",
-            help="Total number of program graduates"
-        )
-    
-    with stats_col2:
-        st.metric(
-            label="Certifications Earned",
-            value="8,200+",
-            help="Industry certifications completed"
-        )
-    
-    with stats_col3:
-        st.metric(
-            label="Job Placements",
-            value="1,800+",
-            help="Scholars who found employment"
-        )
-    
-    with stats_col4:
-        st.metric(
-            label="Countries Reached",
-            value="75+",
-            help="Global reach of the program"
-        )
-    
-    # How It Works Section
-    st.header("How It Works")
-    
-    process_tabs = st.tabs(["Application", "Review", "MoA", "Scholar Life"])
-    
-    with process_tabs[0]:
-        st.subheader("Application Process")
-        col1, col2 = st.columns([2, 1])
-        
-        with col1:
-            st.markdown("""
-            **Step-by-Step Application:**
-            
-            1. **Choose Partner Organization** - Select your preferred learning platform
-            2. **Personal Information** - Tell us about yourself
-            3. **Geographic Details** - Where you're located
-            4. **Education Background** - Your academic journey
-            5. **Goals & Motivation** - Why you want to join
-            6. **Demographics** - Help us understand your situation
-            7. **Email Verification** - Confirm your application
-            
-            **Requirements:**
-            - Must be 16+ years old
-            - Belong to an underrepresented group
-            - Demonstrate motivation to learn
-            - Have access to internet and device
-            """)
-        
-        with col2:
-            st.info("""
-            **Pro Tips:**
-            
-            - Be honest and detailed
-            - Explain your career goals
-            - Show your commitment
-            - Double-check all information
-            """)
-    
-    with process_tabs[1]:
-        st.subheader("Review Process")
+    # Success Stories - Compact
+    with st.container(key="landing-success"):
         st.markdown("""
-        **What Happens After You Apply:**
+        <div style="text-align: center; margin: 2rem 0 1rem 0;">
+            <h2 style="color: #041b2b; font-weight: 600; margin-bottom: 1.5rem;">Success Stories</h2>
+        </div>
+        """, unsafe_allow_html=True)
         
-        - **Confirmation Email** - You'll receive immediate confirmation
-        - **Admin Review** - Partner organization reviews your application
-        - **Review Time** - Typically 2-3 business days
-        - **Evaluation Criteria**:
-          - Eligibility requirements met
-          - Demonstrated need and motivation
-          - Commitment to complete the program
-          - Clear career goals in data science
+        story_col1, story_col2 = st.columns(2, gap="large")
         
-        **Possible Outcomes:**
-        - **Approved** - Move to MoA submission
-        - **Not Selected** - Feedback provided, can reapply
-        """)
-    
-    with process_tabs[2]:
-        st.subheader("Memorandum of Agreement")
-        st.markdown("""
-        **If Approved, You'll Need To:**
+        with story_col1:
+            with st.container(key="success-story-1"):
+                st.markdown("""
+                <div style="padding: 1.5rem; background: linear-gradient(135deg, #f8fffe, #e8fdf7); border-radius: 10px; border-left: 4px solid #07e966;">
+                    <div style="display: flex; align-items: center; margin-bottom: 1rem;">
+                        <div style="width: 50px; height: 50px; background: #07e966; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-right: 1rem;">
+                            <span style="color: white; font-size: 1.2rem;">MR</span>
+                        </div>
+                        <div>
+                            <h4 style="margin: 0; color: #041b2b;">Maria Rodriguez</h4>
+                            <p style="margin: 0; color: #666; font-size: 0.9rem;">Data Analyst, Singapore</p>
+                        </div>
+                    </div>
+                    <p style="font-style: italic; color: #555; font-size: 0.9rem; line-height: 1.4; margin: 0;">
+                        "Went from unemployment to landing my dream job as a Data Analyst in 8 months. The program gave me confidence and a supportive community."
+                    </p>
+                </div>
+                """, unsafe_allow_html=True)
         
-        1. **Receive Approval Email** - Contains login credentials
-        2. **Login to Platform** - Use email + application ID as password
-        3. **Change Password** - Set your secure password
-        4. **Download MoA Template** - Get the agreement document
-        5. **Digital Signature** - Sign the agreement
-        6. **Submit MoA** - Upload signed document
-        7. **Wait for Approval** - 2-3 business days
-        
-        **The MoA Covers:**
-        - Program expectations and requirements
-        - Your commitments as a scholar
-        - Code of conduct and community guidelines
-        - Certification and completion requirements
-        """)
-    
-    with process_tabs[3]:
-        st.subheader("Life as a Scholar")
-        st.markdown("""
-        **Welcome to the Community!**
-        
-        **Your Scholar Benefits:**
-        - **Free Course Access** - Premium content at no cost
-        - **Learning Resources** - Videos, exercises, projects
-        - **Community Access** - Connect with fellow scholars
-        - **Certifications** - Industry-recognized credentials
-        - **Career Support** - Job placement assistance
-        - **Progress Tracking** - Monitor your advancement
-        
-        **Ongoing Requirements:**
-        - Regular participation in courses
-        - Complete assignments and projects
-        - Maintain community guidelines
-        - Share your success story
-        - Help other scholars when possible
-        
-        **Career Outcomes:**
-        - Data Analyst positions
-        - Machine Learning Engineer roles
-        - Business Intelligence specialists
-        - Research and academia opportunities
-        """)
-    
-    # Success Stories Section
-    st.header("Success Stories")
-    
-    story_col1, story_col2 = st.columns(2)
-    
-    with story_col1.container(border=True, height=400):
-        st.markdown("""
-        ### **Maria Rodriguez - Data Analyst**
-        *Philippines → Tech Company, Singapore*
-        
-        *"I went from unemployment to landing my dream job as a Data Analyst in just 8 months. 
-        The program didn't just teach me technical skills - it gave me confidence and a community 
-        that believed in my potential."*
-        
-        **Journey:**
-        - Started: Unemployed fresh graduate
-        - Completed: 6 courses, 3 certifications
-        - Outcome: Data Analyst at major tech firm
-        """)
-    
-    with story_col2.container(border=True, height=400):
-        st.markdown("""
-        ### **James Wilson - ML Engineer**
-        *Kenya → Fintech Startup, Remote*
-        
-        *"Coming from a non-technical background, I never thought I could become a Machine Learning 
-        Engineer. The structured learning path and mentorship made it possible."*
-        
-        **Journey:**
-        - Started: Working in retail
-        - Completed: 8 courses, 5 certifications  
-        - Outcome: ML Engineer, remote position
-        """)
+        with story_col2:
+            with st.container(key="success-story-2"):
+                st.markdown("""
+                <div style="padding: 1.5rem; background: linear-gradient(135deg, #f8fffe, #e8fdf7); border-radius: 10px; border-left: 4px solid #07e966;">
+                    <div style="display: flex; align-items: center; margin-bottom: 1rem;">
+                        <div style="width: 50px; height: 50px; background: #07e966; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-right: 1rem;">
+                            <span style="color: white; font-size: 1.2rem;">JW</span>
+                        </div>
+                        <div>
+                            <h4 style="margin: 0; color: #041b2b;">James Wilson</h4>
+                            <p style="margin: 0; color: #666; font-size: 0.9rem;">ML Engineer, Kenya</p>
+                        </div>
+                    </div>
+                    <p style="font-style: italic; color: #555; font-size: 0.9rem; line-height: 1.4; margin: 0;">
+                        "From retail to Machine Learning Engineer! The structured learning path and mentorship made it possible despite my non-technical background."
+                    </p>
+                </div>
+                """, unsafe_allow_html=True)
     
                 
-    # Contact Information
-    st.markdown("---")
-    
-    contact_col1, contact_col2, contact_col3 = st.columns(3)
-    
-    with contact_col1:
-        st.markdown("""
-        ### **Contact Support**
-        
-        **Technical Issues:**
-        - tech-support@datara.org
-        - Live chat (coming soon)
-        
-        **Application Help:**
-        - applications@datara.org
-        - +1-800-DATARA1
-        """)
-    
-    with contact_col2:
-        st.markdown("""
-        ### **Connect With Us**
-        
-        **Social Media:**
-        - @DaTARA_Official
-        - Facebook.com/DaTARA
-        - LinkedIn.com/company/datara
-        
-        **Newsletter:**
-        - Monthly updates
-        - Success stories
-        """)
-    
-    with contact_col3:
-        st.markdown("""
-        ### **Resources**
-        
-        **Learning Resources:**
-        - Study guides
-        - Tutorial videos
-        - Career advice
-        
-        **Community:**
-        - Scholar forums
-        - Study groups
-        - Mentorship program
-        """)
-    

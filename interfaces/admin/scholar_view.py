@@ -32,36 +32,39 @@ def admin_scholars_page():
         return
     
     # Filter Controls
-    col1, col2, col3, col4 = st.columns([2, 2, 2, 1])
-    
-    with col1:
-        status_filter = st.selectbox(
-            "Filter by Status",
-            options=["All", "Active", "Inactive"]
-        )
-    
-    with col2:
-        search_term = st.text_input("Search", placeholder="Name, email, or Scholar ID...")
-    
-    with col3:
-        sort_by = st.selectbox(
-            "Sort by",
-            options=["Newest First", "Oldest First", "Name A-Z", "Name Z-A", "Scholar ID"]
-        )
-    
-    with col4:
-        if st.button("Refresh", use_container_width=True):
-            st.rerun()
+    with st.container(key="admin-filters"):
+        col1, col2, col3, col4 = st.columns([2, 2, 2, 1])
+        
+        with col1:
+            status_filter = st.selectbox(
+                "Filter by Status",
+                options=["All", "Active", "Inactive"]
+            )
+        
+        with col2:
+            search_term = st.text_input("Search", placeholder="Name, email, or Scholar ID...")
+        
+        with col3:
+            sort_by = st.selectbox(
+                "Sort by",
+                options=["Newest First", "Oldest First", "Name A-Z", "Name Z-A", "Scholar ID"]
+            )
+        
+        with col4:
+            if st.button("Refresh", use_container_width=True):
+                st.rerun()
     
     # Apply filters
     filtered_scholars = filter_scholars(scholars, status_filter, search_term, sort_by)
     
     # Statistics Dashboard
-    display_scholar_statistics(filtered_scholars, scholars)
+    with st.container(key="admin-metrics"):
+        display_scholar_statistics(filtered_scholars, scholars)
     
     # Scholars CRUD Table
-    st.header("Scholars Directory Table")
-    display_scholars_table(filtered_scholars)
+    with st.container(key="admin-table"):
+        st.header("Scholars Directory Table")
+        display_scholars_table(filtered_scholars)
 
 
 def filter_scholars(scholars, status_filter, search_term, sort_by):
@@ -153,6 +156,12 @@ def display_scholar_statistics(filtered_scholars, all_scholars):
                 title="Scholar Enrollment Over Time",
                 labels={'enrollment_date': 'Date', 'count': 'New Scholars'}
             )
+            fig_timeline.update_layout(
+                font=dict(color='#041b2b'),
+                paper_bgcolor='rgba(255,255,255,0.8)',
+                plot_bgcolor='rgba(255,255,255,0.8)'
+            )
+            fig_timeline.update_traces(line_color='#07e966', line_width=3)
             st.plotly_chart(fig_timeline, use_container_width=True)
         
         with chart_col2:
@@ -165,6 +174,12 @@ def display_scholar_statistics(filtered_scholars, all_scholars):
                 title="Top 10 Countries by Scholar Count",
                 labels={'x': 'Number of Scholars', 'y': 'Country'}
             )
+            fig_country.update_layout(
+                font=dict(color='#041b2b'),
+                paper_bgcolor='rgba(255,255,255,0.8)',
+                plot_bgcolor='rgba(255,255,255,0.8)'
+            )
+            fig_country.update_traces(marker_color='#07e966')
             st.plotly_chart(fig_country, use_container_width=True)
 
 

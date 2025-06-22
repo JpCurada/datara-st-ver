@@ -42,12 +42,13 @@ def public_applications_page():
         st.session_state.otp_verified = False
 
     # Progress bar
-    _, progress_col, _ = st.columns([1, 2, 1])
-    progress = (st.session_state.step + 1) / len(steps)
-    progress_col.progress(progress, text=f"Step {st.session_state.step + 1} of {len(steps)}: {steps[st.session_state.step]}")
+    with st.container():
+        _, progress_col, _ = st.columns([1, 2, 1])
+        progress = (st.session_state.step + 1) / len(steps)
+        progress_col.progress(progress, text=f"Step {st.session_state.step + 1} of {len(steps)}: {steps[st.session_state.step]}")
     
     _, step_col, _ = st.columns([1, 2, 1])
-    with step_col.container(border=True):
+    with step_col.container(border=False, key=f"application-step-{st.session_state.step}"):
         step = st.session_state.step
 
         # --- Step 0: Partner Organization & Data Privacy ---
@@ -593,22 +594,29 @@ def public_applications_page():
                             st.balloons()
                             st.info("You will receive an email confirmation shortly. We will review your application and contact you within 2-3 business days.")
                             
-                            # Clear form data after successful submission
-                            if st.button("Submit Another Application", use_container_width=True):
-                                for key in list(st.session_state.keys()):
-                                    del st.session_state[key]
-                                st.rerun()
+                            # Clear form data after successful submission - moved to session state
+                            st.session_state.show_new_application_button = True
                         else:
                             st.error("Failed to save application. Please try again.")
                     else:
                         st.session_state.otp_attempts = st.session_state.get("otp_attempts", 0) + 1
                         if st.session_state.otp_attempts >= 3:
                             st.error("Too many failed attempts. Please restart the application process.")
-                            if st.button("Restart Application", use_container_width=True):
-                                for key in list(st.session_state.keys()):
-                                    del st.session_state[key]
-                                st.rerun()
+                            st.session_state.show_restart_button = True
                         else:
                             remaining = 3 - st.session_state.otp_attempts
                             st.error(f"Invalid verification code. {remaining} attempts remaining.")
                             st.warning("Please check your email and enter the correct 6-digit code.")
+
+                # Handle buttons outside of verification logic
+                if st.session_state.get("show_new_application_button", False):
+                    if st.button("Submit Another Application", use_container_width=True):
+                        for key in list(st.session_state.keys()):
+                            del st.session_state[key]
+                        st.rerun()
+                
+                if st.session_state.get("show_restart_button", False):
+                    if st.button("Restart Application", use_container_width=True):
+                        for key in list(st.session_state.keys()):
+                            del st.session_state[key]
+                        st.rerun()

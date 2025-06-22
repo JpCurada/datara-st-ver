@@ -10,6 +10,7 @@ from utils.queries import (
     approve_application, 
     reject_application
 )
+from components.footer import display_footer
 
 
 def admin_applications_page():
@@ -29,38 +30,42 @@ def admin_applications_page():
         return
 
     # Filter Controls
-    col1, col2, col3, col4 = st.columns([2, 2, 2, 1])
-    
-    with col1:
-        status_filter = st.selectbox(
-            "Filter by Status",
-            options=["All", "PENDING", "APPROVED", "REJECTED"],
-            index=1
-        )
-    
-    with col2:
-        search_term = st.text_input("Search", placeholder="Name, email, or country...")
-    
-    with col3:
-        sort_by = st.selectbox(
-            "Sort by",
-            options=["Applied Date (Newest)", "Applied Date (Oldest)", "Name A-Z", "Name Z-A"]
-        )
-    
-    with col4:
-        if st.button("Refresh", use_container_width=True):
-            st.rerun()
+    with st.container(key="admin-filters"):
+        col1, col2, col3, col4 = st.columns([2, 2, 2, 1])
+        
+        with col1:
+            status_filter = st.selectbox(
+                "Filter by Status",
+                options=["All", "PENDING", "APPROVED", "REJECTED"],
+                index=1
+            )
+        
+        with col2:
+            search_term = st.text_input("Search", placeholder="Name, email, or country...")
+        
+        with col3:
+            sort_by = st.selectbox(
+                "Sort by",
+                options=["Applied Date (Newest)", "Applied Date (Oldest)", "Name A-Z", "Name Z-A"]
+            )
+        
+        with col4:
+            if st.button("Refresh", use_container_width=True):
+                st.rerun()
 
     # Apply filters
     filtered_apps = filter_applications(applications, status_filter, search_term, sort_by)
     
     # Statistics Dashboard
-    display_application_statistics(filtered_apps, applications)
+    with st.container(key="admin-metrics"):
+        display_application_statistics(filtered_apps, applications)
     
     # Applications CRUD Table
-    st.header("Applications Table")
-    display_applications_table(filtered_apps, admin_id)
+    with st.container(key="admin-table"):
+        st.header("Applications Table")
+        display_applications_table(filtered_apps, admin_id)
 
+    
 
 def filter_applications(applications, status_filter, search_term, sort_by):
     """Filter and sort applications based on criteria"""
@@ -129,9 +134,14 @@ def display_application_statistics(filtered_apps, all_apps):
                 title="Application Status Distribution",
                 color_discrete_map={
                     'PENDING': '#ffc107',
-                    'APPROVED': '#28a745',
+                    'APPROVED': '#07e966',
                     'REJECTED': '#dc3545'
                 }
+            )
+            fig_status.update_layout(
+                font=dict(color='#041b2b'),
+                paper_bgcolor='rgba(255,255,255,0.8)',
+                plot_bgcolor='rgba(255,255,255,0.8)'
             )
             st.plotly_chart(fig_status, use_container_width=True)
         
@@ -145,6 +155,12 @@ def display_application_statistics(filtered_apps, all_apps):
                 title="Top 10 Countries by Applications",
                 labels={'x': 'Number of Applications', 'y': 'Country'}
             )
+            fig_country.update_layout(
+                font=dict(color='#041b2b'),
+                paper_bgcolor='rgba(255,255,255,0.8)',
+                plot_bgcolor='rgba(255,255,255,0.8)'
+            )
+            fig_country.update_traces(marker_color='#07e966')
             st.plotly_chart(fig_country, use_container_width=True)
 
 

@@ -34,30 +34,32 @@ def display_approved_applicant_moa_interface():
     approved_applicant_id = user['approved_applicant_id']
     partner_org = applicant_data['partner_organizations']['display_name']
     
-    st.title(f"Welcome, {application_data['first_name']}!")
-    st.subheader(f"MoA Submission Required - {partner_org}")
+    with st.container(key="scholar-welcome"):
+        st.title(f"Welcome, {application_data['first_name']}!")
+        st.subheader(f"MoA Submission Required - {partner_org}")
     
     # Status indicator
-    col1, col2 = st.columns([2, 1])
-    
-    with col1:
-        st.info(f"**Your Approved Applicant ID:** `{approved_applicant_id}`")
-    
-    with col2:
-        st.warning("MoA Submission Required")
-    
-    # Progress indicator
-    st.header("Your Progress")
-    progress_col1, progress_col2, progress_col3 = st.columns(3)
-    
-    with progress_col1:
-        st.success("1. Application Approved")
-    
-    with progress_col2:
-        st.warning("2. MoA Submission")
-    
-    with progress_col3:
-        st.info("3. Scholar Activation")
+    with st.container(key="scholar-progress"):
+        col1, col2 = st.columns([2, 1])
+        
+        with col1:
+            st.info(f"**Your Approved Applicant ID:** `{approved_applicant_id}`")
+        
+        with col2:
+            st.warning("MoA Submission Required")
+        
+        # Progress indicator
+        st.header("Your Progress")
+        progress_col1, progress_col2, progress_col3 = st.columns(3)
+        
+        with progress_col1:
+            st.success("1. Application Approved")
+        
+        with progress_col2:
+            st.warning("2. MoA Submission")
+        
+        with progress_col3:
+            st.info("3. Scholar Activation")
     
     st.divider()
     
@@ -236,17 +238,19 @@ def display_transition_to_scholar():
 
 def display_active_scholar_dashboard(scholar_data, application_data, scholar_id, partner_org):
     """Regular scholar dashboard for active scholars - simplified version"""
-    st.title(f"Welcome back, {application_data['first_name']}!")
-    st.subheader(f"Active Scholar - {partner_org}")
+    with st.container(key="scholar-welcome"):
+        st.title(f"Welcome back, {application_data['first_name']}!")
+        st.subheader(f"Active Scholar - {partner_org}")
     
     # Scholar status card
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        st.metric("Scholar ID", scholar_id)
-    
-    with col2:
-        st.metric("Status", "Active", delta="Enrolled")
+    with st.container(key="scholar-progress"):
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            st.metric("Scholar ID", scholar_id)
+        
+        with col2:
+            st.metric("Status", "Active", delta="Enrolled")
     
     with col3:
         created_date = scholar_data['created_at']

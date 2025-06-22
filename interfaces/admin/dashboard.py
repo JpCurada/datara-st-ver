@@ -32,21 +32,24 @@ def admin_dashboard_page():
     scholars = get_scholars_for_admin(partner_org_id)
     
     # Key Metrics Dashboard
-    display_key_metrics(metrics, org_stats)
+    with st.container(key="admin-metrics"):
+        display_key_metrics(metrics, org_stats)
     
     # Charts and Analytics
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        display_application_trends(analytics, recent_applications)
-        display_country_distribution(analytics)
-    
-    with col2:
-        display_status_overview(analytics)
-        display_scholar_timeline(scholars)
+    with st.container(key="admin-charts"):
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            display_application_trends(analytics, recent_applications)
+            display_country_distribution(analytics)
+        
+        with col2:
+            display_status_overview(analytics)
+            display_scholar_timeline(scholars)
     
     # Recent Activity and Quick Actions
-    display_recent_activity(recent_applications, scholars)
+    with st.container(key="admin-table"):
+        display_recent_activity(recent_applications, scholars)
     
 
 def display_key_metrics(metrics, org_stats):
@@ -124,7 +127,13 @@ def display_application_trends(analytics, recent_applications):
         title='Daily Application Submissions (Last 10)',
         labels={'application_date': 'Date', 'count': 'Applications'}
     )
-    fig.update_layout(height=300)
+    fig.update_layout(
+        height=300,
+        font=dict(color='#041b2b'),
+        paper_bgcolor='rgba(255,255,255,0.8)',
+        plot_bgcolor='rgba(255,255,255,0.8)'
+    )
+    fig.update_traces(line_color='#07e966', line_width=3)
     st.plotly_chart(fig, use_container_width=True)
 
 
@@ -145,11 +154,16 @@ def display_status_overview(analytics):
         title="Application Status Distribution",
         color_discrete_map={
             'PENDING': '#ffc107',
-            'APPROVED': '#28a745',
+            'APPROVED': '#07e966',
             'REJECTED': '#dc3545'
         }
     )
-    fig.update_layout(height=300)
+    fig.update_layout(
+        height=300,
+        font=dict(color='#041b2b'),
+        paper_bgcolor='rgba(255,255,255,0.8)',
+        plot_bgcolor='rgba(255,255,255,0.8)'
+    )
     st.plotly_chart(fig, use_container_width=True)
 
 
@@ -176,7 +190,13 @@ def display_country_distribution(analytics):
             title="Top 10 Countries by Applications",
             labels={'x': 'Number of Applications', 'y': 'Country'}
         )
-        fig.update_layout(height=300)
+        fig.update_layout(
+            height=300,
+            font=dict(color='#041b2b'),
+            paper_bgcolor='rgba(255,255,255,0.8)',
+            plot_bgcolor='rgba(255,255,255,0.8)'
+        )
+        fig.update_traces(marker_color='#07e966')
         st.plotly_chart(fig, use_container_width=True)
 
 
@@ -204,7 +224,13 @@ def display_scholar_timeline(scholars):
         title='Scholar Enrollments Over Time',
         labels={'enrollment_date': 'Date', 'count': 'New Scholars'}
     )
-    fig.update_layout(height=300)
+    fig.update_layout(
+        height=300,
+        font=dict(color='#041b2b'),
+        paper_bgcolor='rgba(255,255,255,0.8)',
+        plot_bgcolor='rgba(255,255,255,0.8)'
+    )
+    fig.update_traces(fill='tonexty', fillcolor='rgba(7, 233, 102, 0.3)', line_color='#07e966')
     st.plotly_chart(fig, use_container_width=True)
 
 

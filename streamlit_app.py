@@ -4,6 +4,9 @@ import os
 import interfaces as pg
 from utils.auth import is_authenticated, is_admin, is_scholar, is_approved_applicant, get_current_user, logout
 
+from components.footer import display_footer
+
+
 st.set_page_config(
     page_title="DaTARA - Data Science Scholarship Platform",
     layout="wide",
@@ -49,7 +52,7 @@ if not is_authenticated():
     }, position="hidden")
     
     # Create custom top navigation bar
-    with st.container():
+    with st.container(key="public-nav"):
         nav_col1, nav_col2, nav_col3 = st.columns([1, 2, 2])
         
         with nav_col1:
@@ -77,7 +80,6 @@ if not is_authenticated():
                     if st.button("Apply", use_container_width=True, type="primary"):
                         st.switch_page(public_applications)
         
-        st.divider()
 
 elif is_admin():
     # === ADMIN NAVIGATION ===
@@ -96,7 +98,7 @@ elif is_admin():
     })
     
     # Admin header with user info and navigation
-    with st.container():
+    with st.container(key="admin-header"):
         header_col1, header_col2, header_col3 = st.columns([2, 2, 3])
         
         with header_col1:
@@ -128,12 +130,17 @@ elif is_admin():
                         st.switch_page(admin_scholars)
                 
                 with admin_nav[4]:
-                    if st.button("Logout", use_container_width=True, type="secondary"):
-                        logout()
-                        st.success("Logged out successfully!")
-                        st.rerun()
+                    with st.popover("Logout"):
+                        st.write("Are you sure you want to log out?")
+                        
+                        if st.button("Cancel", key="admin_logout_cancel", use_container_width=True):
+                            st.toast("Logout cancelled.")
+                        
+                        if st.button("Confirm Logout", key="admin_logout_confirm", type="primary", use_container_width=True):
+                            logout()
+                            st.success("Logged out successfully!")
+                            st.rerun()
         
-        st.divider()
 
 elif is_scholar() or is_approved_applicant():
     # === SCHOLAR & APPROVED APPLICANT NAVIGATION ===
@@ -165,7 +172,7 @@ elif is_scholar() or is_approved_applicant():
     })
     
     # Scholar header with info and navigation
-    with st.container():
+    with st.container(key="scholar-header"):
         scholar_header_col1, scholar_header_col2, scholar_header_col3 = st.columns([1, 2, 2])
         
         with scholar_header_col1:
@@ -210,34 +217,11 @@ elif is_scholar() or is_approved_applicant():
                             logout()
                             st.success("Logged out successfully!")
                             st.rerun()
-        st.divider()
-
-# Add a footer with system information
-def add_footer():
-    """Add footer with system info"""
-    st.markdown("---")
-    footer_col1, footer_col2, footer_col3 = st.columns([1, 2, 1])
-    
-    with footer_col1:
-        if is_authenticated():
-            user = get_current_user()
-            if user:
-                role = user['role'].replace('_', ' ').title()
-                st.caption(f"Logged in as {role}")
-            else:
-                st.caption("Session loading...")
-    
-    with footer_col2:
-        st.caption("DaTARA Platform • Data Science Education for All")
-    
-    with footer_col3:
-        st.caption("System Status: Online")
 
 # Run the navigation
 try:
     pg_nav.run()
-    add_footer()
-    
+    display_footer()
 except Exception as e:
     st.error(f"Navigation Error: {e}")
     st.info("Please refresh the page or contact support if the issue persists.")

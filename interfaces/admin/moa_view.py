@@ -31,36 +31,39 @@ def admin_moa_page():
         return
     
     # Filter Controls
-    col1, col2, col3, col4 = st.columns([2, 2, 2, 1])
-    
-    with col1:
-        status_filter = st.selectbox(
-            "Filter by Status",
-            options=["All", "PENDING", "SUBMITTED", "APPROVED"]
-        )
-    
-    with col2:
-        search_term = st.text_input("Search", placeholder="Name or email...")
-    
-    with col3:
-        sort_by = st.selectbox(
-            "Sort by",
-            options=["Submitted Date (Newest)", "Submitted Date (Oldest)", "Name A-Z", "Status"]
-        )
-    
-    with col4:
-        if st.button("Refresh", use_container_width=True):
-            st.rerun()
+    with st.container(key="admin-filters"):
+        col1, col2, col3, col4 = st.columns([2, 2, 2, 1])
+        
+        with col1:
+            status_filter = st.selectbox(
+                "Filter by Status",
+                options=["All", "PENDING", "SUBMITTED", "APPROVED"]
+            )
+        
+        with col2:
+            search_term = st.text_input("Search", placeholder="Name or email...")
+        
+        with col3:
+            sort_by = st.selectbox(
+                "Sort by",
+                options=["Submitted Date (Newest)", "Submitted Date (Oldest)", "Name A-Z", "Status"]
+            )
+        
+        with col4:
+            if st.button("Refresh", use_container_width=True):
+                st.rerun()
     
     # Apply filters
     filtered_moas = filter_moa_submissions(moa_submissions, status_filter, search_term, sort_by)
     
     # Statistics Dashboard
-    display_moa_statistics(filtered_moas, moa_submissions)
+    with st.container(key="admin-metrics"):
+        display_moa_statistics(filtered_moas, moa_submissions)
     
     # MoA CRUD Table
-    st.header("MoA Submissions Table")
-    display_moa_table(filtered_moas, admin_id)
+    with st.container(key="admin-table"):
+        st.header("MoA Submissions Table")
+        display_moa_table(filtered_moas, admin_id)
 
 
 def filter_moa_submissions(moa_submissions, status_filter, search_term, sort_by):
@@ -137,8 +140,13 @@ def display_moa_statistics(filtered_moas, all_moas):
                 color_discrete_map={
                     'PENDING': '#ffc107',
                     'SUBMITTED': '#17a2b8',
-                    'APPROVED': '#28a745'
+                    'APPROVED': '#07e966'
                 }
+            )
+            fig_status.update_layout(
+                font=dict(color='#041b2b'),
+                paper_bgcolor='rgba(255,255,255,0.8)',
+                plot_bgcolor='rgba(255,255,255,0.8)'
             )
             st.plotly_chart(fig_status, use_container_width=True)
         
@@ -155,6 +163,12 @@ def display_moa_statistics(filtered_moas, all_moas):
                 title="MoA Submissions Over Time",
                 labels={'submission_date': 'Date', 'count': 'Submissions'}
             )
+            fig_timeline.update_layout(
+                font=dict(color='#041b2b'),
+                paper_bgcolor='rgba(255,255,255,0.8)',
+                plot_bgcolor='rgba(255,255,255,0.8)'
+            )
+            fig_timeline.update_traces(line_color='#07e966', line_width=3)
             st.plotly_chart(fig_timeline, use_container_width=True)
 
 
