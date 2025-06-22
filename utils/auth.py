@@ -187,7 +187,7 @@ def scholar_login_auth(scholar_id: str, email: str, birth_date: str) -> bool:
     try:
         response = supabase.table("scholars").select(
             "scholar_id, partner_org_id, is_active, created_at, "
-            "applications!inner(email, birthdate, first_name, last_name), "
+            "applications!inner(email, birthdate, first_name, last_name, country, education_status, institution_name, institution_country, state_region_province, city, postal_code), "  # Add empty fields in needed
             "partner_organizations!inner(display_name)"
         ).eq("scholar_id", scholar_id).eq("is_active", True).execute()
         
@@ -232,7 +232,7 @@ def approved_applicant_login_auth(approved_applicant_id: str, email: str, birth_
         # Fixed query: Use proper table relationships
         response = supabase.table("approved_applicants").select(
             "approved_applicant_id, application_id, created_at, "
-            "applications!inner(email, birthdate, first_name, last_name, partner_org_id, "
+            "applications!inner(email, birthdate, first_name, last_name, country, education_status, institution_name, institution_country, state_region_province, city, postal_code), "  # Add empty fields in needed
             "partner_organizations!inner(display_name))"
         ).eq("approved_applicant_id", approved_applicant_id).execute()
         

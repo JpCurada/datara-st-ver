@@ -235,7 +235,7 @@ def display_transition_to_scholar():
 
 
 def display_active_scholar_dashboard(scholar_data, application_data, scholar_id, partner_org):
-    """Regular scholar dashboard for active scholars"""
+    """Regular scholar dashboard for active scholars - simplified version"""
     st.title(f"Welcome back, {application_data['first_name']}!")
     st.subheader(f"Active Scholar - {partner_org}")
     
@@ -254,142 +254,92 @@ def display_active_scholar_dashboard(scholar_data, application_data, scholar_id,
     
     st.divider()
     
-    # Dashboard sections
-    dashboard_tabs = st.tabs(["Overview", "Learning Progress", "Certifications", "Profile"])
-    
-    with dashboard_tabs[0]:
-        display_scholar_overview(scholar_data, application_data, partner_org)
-    
-    with dashboard_tabs[1]:
-        display_learning_progress(scholar_id)
-    
-    with dashboard_tabs[2]:
-        display_certifications(scholar_id)
-    
-    with dashboard_tabs[3]:
-        display_scholar_profile(scholar_data, application_data)
-
-
-def display_scholar_overview(scholar_data, application_data, partner_org):
-    """Display scholar overview section"""
-    st.header("Program Overview")
-    
+    # Basic scholar benefits info
+    st.subheader("Your Scholar Benefits")
     col1, col2 = st.columns(2)
     
     with col1:
-        st.subheader("Your Benefits")
-        st.write(f"- Free access to {partner_org} premium courses")
-        st.write("- Industry-recognized certifications")
-        st.write("- Career support and job placement")
-        st.write("- Scholar community access")
-        st.write("- Personalized learning paths")
-        st.write("- Mentorship opportunities")
+        st.write(f"✅ Free access to {partner_org} premium courses")
+        st.write("✅ Industry-recognized certifications")
+        st.write("✅ Career support and job placement")
     
     with col2:
-        st.subheader("Quick Actions")
-        
-        if st.button("Access Learning Platform", use_container_width=True, type="primary"):
-            st.info(f"You will receive your {partner_org} platform invitation within 1-2 business days.")
-        
-        if st.button("Update Profile", use_container_width=True):
-            st.info("Profile update feature coming soon.")
-        
-        if st.button("Contact Support", use_container_width=True):
-            st.info("Support: support@datara.org")
+        st.write("✅ Scholar community access")
+        st.write("✅ Personalized learning paths") 
+        st.write("✅ Mentorship opportunities")
     
-    # Recent activity placeholder
-    st.subheader("Recent Activity")
-    st.info("Activity tracking will be available once you start your courses.")
+    # Contact info
+    st.info(f"You will receive your {partner_org} platform invitation within 1-2 business days. For support, contact: support@datara.org")
+
+    # Scholar certification feed
+    st.divider()
+    st.subheader("Recent Scholar Certifications")
+    display_scholar_cert_feed(scholar_id)
 
 
-def display_learning_progress(scholar_id):
-    """Display learning progress section"""
-    st.header("Learning Progress")
-    
-    # This would typically fetch real data from the learning platform
-    st.info("Course progress tracking will be available once you access the learning platform.")
-    
-    # Placeholder progress
-    st.subheader("Recommended Learning Path")
-    courses = [
-        "Introduction to Data Science",
-        "Python Fundamentals",
-        "Data Manipulation with Pandas",
-        "Data Visualization",
-        "Statistical Analysis",
-        "Machine Learning Basics"
-    ]
-    
-    for i, course in enumerate(courses):
-        if i == 0:
-            st.success(f"{i+1}. {course} - Ready to start")
-        else:
-            st.info(f"{i+1}. {course} - Locked")
-
-
-def display_certifications(scholar_id):
-    """Display certifications section"""
-    st.header("Certifications")
-    
-    # Get actual certifications from database
+def display_scholar_cert_feed(current_scholar_id):
+    """Show a feed of recent certifications from all scholars except the current user, in 3 columns per row."""
     supabase = get_supabase_client()
-    
     try:
-        response = supabase.table("certifications").select("*").eq("scholar_id", scholar_id).execute()
-        certifications = response.data
-        
-        if certifications:
-            for cert in certifications:
-                with st.expander(f"{cert['name']} - {cert['issuing_organization']}"):
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        st.write(f"**Issued:** {cert['issue_month']}/{cert['issue_year']}")
-                        if cert.get('expiration_month'):
-                            st.write(f"**Expires:** {cert['expiration_month']}/{cert['expiration_year']}")
-                    with col2:
-                        if cert.get('credential_id'):
-                            st.write(f"**Credential ID:** {cert['credential_id']}")
-                        if cert.get('credential_url'):
-                            st.link_button("View Certificate", cert['credential_url'])
-        else:
-            st.info("No certifications yet. Complete courses to earn certifications!")
-            
+        response = supabase.table("certifications").select(
+            """
+            name, issuing_organization, issue_month, issue_year, credential_url, scholar_id,
+            scholars!inner(
+                application_id,
+                applications!inner(first_name, last_name)
+            )
+            """
+        ).order("created_at", desc=True).limit(30).execute()  # Fetch more for more rows
+        certs = response.data
+
+        if not certs:
+            st.info("No recent certifications from other scholars yet.")
+            return
+
+        # Create margin and content columns (just like scholar_profile.py)
+        _, left_col, _, right_col, _ = st.columns([0.03, 0.8, 0.08, 0.8, 0.03])
+
+        # Use left_col and right_col for your two feed columns
+        with left_col:
+            # First column of certifications
+            for i, cert in enumerate(certs):
+                if i % 2 == 0 and cert["scholar_id"] != current_scholar_id:
+                    scholar = cert.get("scholars", {})
+                    application = scholar.get("applications", {})
+                    full_name = f"{application.get('first_name', '')} {application.get('last_name', '')}".strip()
+                    st.markdown(
+                        f'<div class="cert-feed-post">'
+                        f'<div class="cert-feed-header"><b>{full_name} just posted a new certification!</b></div>'
+                        f'<div class="cert-feed-body">'
+                        f'Certification: <b>{cert["name"]}</b><br>'
+                        f'Issued by: {cert["issuing_organization"]}<br>'
+                        f'Issued at: {cert["issue_month"]}/{cert["issue_year"]}'
+                        f'</div>',
+                        unsafe_allow_html=True
+                    )
+                    if cert.get("credential_url"):
+                        st.link_button("View", cert["credential_url"], use_container_width=True)
+                    st.markdown('</div>', unsafe_allow_html=True)
+
+        with right_col:
+            # Second column of certifications
+            for i, cert in enumerate(certs):
+                if i % 2 == 1 and cert["scholar_id"] != current_scholar_id:
+                    scholar = cert.get("scholars", {})
+                    application = scholar.get("applications", {})
+                    full_name = f"{application.get('first_name', '')} {application.get('last_name', '')}".strip()
+                    st.markdown(
+                        f'<div class="cert-feed-post">'
+                        f'<div class="cert-feed-header"><b>{full_name} just posted a new certification!</b></div>'
+                        f'<div class="cert-feed-body">'
+                        f'Certification: <b>{cert["name"]}</b><br>'
+                        f'Issued by: {cert["issuing_organization"]}<br>'
+                        f'Issued at: {cert["issue_month"]}/{cert["issue_year"]}'
+                        f'</div>',
+                        unsafe_allow_html=True
+                    )
+                    if cert.get("credential_url"):
+                        st.link_button("View", cert["credential_url"], use_container_width=True)
+                    st.markdown('</div>', unsafe_allow_html=True)
     except Exception as e:
-        st.error(f"Error loading certifications: {e}")
-
-
-def display_scholar_profile(scholar_data, application_data):
-    """Display scholar profile section"""
-    st.header("Profile Information")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.subheader("Personal Information")
-        st.write(f"**Name:** {application_data['first_name']} {application_data['last_name']}")
-        st.write(f"**Email:** {application_data['email']}")
-        st.write(f"**Country:** {application_data['country']}")
-        st.write(f"**Scholar Since:** {scholar_data['created_at'][:10]}")
-    
-    with col2:
-        st.subheader("Academic Background")
-        st.write(f"**Education Status:** {application_data.get('education_status', 'N/A')}")
-        st.write(f"**Institution:** {application_data.get('institution_name', 'N/A')}")
-        st.write(f"**Programming Experience:** {application_data.get('programming_experience', 'N/A')}")
-        st.write(f"**Data Science Experience:** {application_data.get('data_science_experience', 'N/A')}")
-    
-    # Profile actions
-    st.subheader("Profile Actions")
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        if st.button("Update Bio", use_container_width=True):
-            st.info("Bio update feature coming soon.")
-    
-    with col2:
-        if st.button("Upload Photo", use_container_width=True):
-            st.info("Photo upload feature coming soon.")
-    
-    with col3:
-        if st.button("Download Profile", use_container_width=True):
-            st.info("Profile download feature coming soon.")
+        st.error(f"Error loading certification feed: {e}")

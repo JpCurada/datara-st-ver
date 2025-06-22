@@ -33,4 +33,3 @@ div[data-testid="stButton"] {
 
 /* Hide the page navigation pills if they exist */
 div[data-testid="stPageNavButtonContainer"] {display: none;}
-
