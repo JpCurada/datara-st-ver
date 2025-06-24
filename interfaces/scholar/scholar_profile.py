@@ -485,46 +485,6 @@ def get_application_id_by_scholar_id(scholar_id: str) -> Optional[str]:
         st.error(f"Error fetching application ID: {e}")
         return None
 
-def upload_certification(scholar_id: str, cert_data: Dict[str, Any]) -> bool:
-    """Upload a new certification"""
-    supabase = get_supabase_client()
-    
-    try:
-        # First, upload the file to Supabase Storage (if you have it configured)
-        file_url = None
-        if cert_data.get('file'):
-            file_url = upload_certification_file(cert_data['file'], scholar_id)
-        
-        # Insert certification record
-        certification_record = {
-            'scholar_id': scholar_id,
-            'name': cert_data['name'],
-            'issuing_organization': cert_data['issuing_organization'],
-            'issue_month': cert_data['issue_date'].month,
-            'issue_year': cert_data['issue_date'].year,
-            'expiration_month': cert_data['expiry_date'].month if cert_data['expiry_date'] else None,
-            'expiration_year': cert_data['expiry_date'].year if cert_data['expiry_date'] else None,
-            'file_url': file_url
-        }
-        
-        response = supabase.table("certifications").insert(certification_record).execute()
-        
-        return len(response.data) > 0
-    except Exception as e:
-        st.error(f"Error uploading certification: {e}")
-        return False
-
-def upload_certification_file(uploaded_file, scholar_id: str) -> Optional[str]:
-    """Upload certification file to storage"""
-    try:
-        # Placeholder implementation
-        file_name = f"cert_{scholar_id}_{uploaded_file.name}"
-        st.info(f"File upload feature coming soon. File: {file_name}")
-        return f"placeholder_url/{file_name}"
-    except Exception as e:
-        st.error(f"Error uploading file: {e}")
-        return None
-
 def delete_certification(certification_id: str) -> bool:
     """Delete a certification"""
     supabase = get_supabase_client()

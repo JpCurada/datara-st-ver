@@ -306,7 +306,7 @@ def get_scholars_for_admin(partner_org_id: str) -> List[Dict[str, Any]]:
     try:
         response = supabase.table("scholars").select(
             "scholar_id, created_at, is_active, "
-            "applications!inner(first_name, last_name, email, country), "
+            "applications!inner(application_id, first_name, last_name, email, country), "
             "partner_organizations!inner(display_name)"
         ).eq("partner_org_id", partner_org_id).order("created_at", desc=True).execute()
         
@@ -1146,3 +1146,16 @@ def get_recent_activities(partner_org_id: str, limit: int = 10) -> Dict[str, Lis
             "recent_scholars": [],
             "recent_moas": []
         }
+
+def batch_fetch_demographics(supabase, application_ids, batch_size=100):
+    """Batch query demographics for a list of application_ids."""
+    demographics_lookup = {}
+    for i in range(0, len(application_ids), batch_size):
+        batch_ids = application_ids[i:i+batch_size]
+        demographics_data = supabase.table("application_demographics") \
+            .select("application_id, demographic_group") \
+            .in_("application_id", batch_ids) \
+            .execute().data
+        for row in demographics_data:
+            demographics_lookup.setdefault(row['application_id'], []).append(row['demographic_group'])
+    return demographics_lookup
