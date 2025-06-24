@@ -3,7 +3,7 @@ import streamlit as st
 from utils.auth import require_auth, get_current_user, is_approved_applicant
 from utils.db import get_supabase_client
 from utils.queries import generate_scholar_id
-from typing import Optional
+from typing import Dict, Any, Optional
 
 
 def scholar_dashboard_page():
@@ -275,6 +275,8 @@ def display_active_scholar_dashboard(scholar_data, application_data, scholar_id,
     # Contact info
     st.info(f"You will receive your {partner_org} platform invitation within 1-2 business days. For support, contact: support@datara.org")
 
+    display_add_certification_form(scholar_id)
+
     # Scholar certification feed
     st.divider()
     st.subheader("Recent Scholar Certifications")
@@ -347,3 +349,74 @@ def display_scholar_cert_feed(current_scholar_id):
                     st.markdown('</div>', unsafe_allow_html=True)
     except Exception as e:
         st.error(f"Error loading certification feed: {e}")
+
+def upload_certification(scholar_id: str, cert_data: Dict[str, Any]) -> bool:
+    """Upload a new certification"""
+    supabase = get_supabase_client()
+    
+    try:
+        # First, upload the file to Supabase Storage (if you have it configured)
+        file_url = None
+        if cert_data.get('file'):
+            file_url = upload_certification_file(cert_data['file'], scholar_id)
+        
+        # Insert certification record
+        certification_record = {
+            'scholar_id': scholar_id,
+            'name': cert_data['name'],
+            'issuing_organization': cert_data['issuing_organization'],
+            'issue_month': cert_data['issue_date'].month,
+            'issue_year': cert_data['issue_date'].year,
+            'expiration_month': cert_data['expiry_date'].month if cert_data['expiry_date'] else None,
+            'expiration_year': cert_data['expiry_date'].year if cert_data['expiry_date'] else None,
+            'certificate_file_url': file_url,
+            'credential_url': cert_data.get('credential_url', None)
+        }
+        
+        response = supabase.table("certifications").insert(certification_record).execute()
+        
+        return len(response.data) > 0
+    except Exception as e:
+        st.error(f"Error uploading certification: {e}")
+        return False
+
+def upload_certification_file(uploaded_file, scholar_id: str) -> Optional[str]:
+    """Upload certification file to storage"""
+    try:
+        # Placeholder implementation
+        file_name = f"cert_{scholar_id}_{uploaded_file.name}"
+        st.info(f"File upload feature coming soon. File: {file_name}")
+        return f"placeholder_url/{file_name}"
+    except Exception as e:
+        st.error(f"Error uploading file: {e}")
+        return None
+
+def display_add_certification_form(scholar_id: str):
+    """Show form for adding a new certification."""
+    with st.expander("➕ Add Certification", expanded=False):
+        with st.form("add_certification_form"):
+            cert_name = st.text_input("Certification Name *", max_chars=100)
+            issuing_org = st.text_input("Issuing Organization *", max_chars=100)
+            issue_date = st.date_input("Issue Date *")
+            expiry_date = st.date_input("Expiration Date (optional)", value=None)
+            credential_url = st.text_input("Credential URL (optional)")
+            uploaded_file = st.file_uploader("Upload Certificate (optional)", type=["pdf", "jpg", "png"])
+            submit_cert = st.form_submit_button("Add Certification", type="primary")
+            
+            if submit_cert:
+                if not cert_name or not issuing_org or not issue_date:
+                    st.error("Please fill in all required fields.")
+                else:
+                    cert_data = {
+                        "name": cert_name,
+                        "issuing_organization": issuing_org,
+                        "issue_date": issue_date,
+                        "expiry_date": expiry_date if expiry_date else None,
+                        "credential_url": credential_url,
+                        "file": uploaded_file
+                    }
+                    if upload_certification(scholar_id, cert_data):
+                        st.success("Certification added!")
+                        st.rerun()
+                    else:
+                        st.error("Failed to add certification.")

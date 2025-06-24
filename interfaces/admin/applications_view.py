@@ -8,7 +8,9 @@ from utils.queries import (
     get_applications_for_admin, 
     get_application_details, 
     approve_application, 
-    reject_application
+    reject_application,
+    get_supabase_client,
+    batch_fetch_demographics
 )
 from components.footer import display_footer
 
@@ -19,72 +21,94 @@ def admin_applications_page():
     partner_org_id = user['partner_org_id']
     partner_org_name = user['data']['partner_organizations']['display_name']
     admin_id = user['data']['admin_id']
-    
+
     st.title(f"Applications Management - {partner_org_name}")
-    
+
     # Get applications data
     applications = get_applications_for_admin(partner_org_id)
-    
     if not applications:
         st.info("No applications found for your organization.")
         return
 
-    # Filter Controls
+    # --- Demographics Lookup ---
+    application_ids = [app['application_id'] for app in applications if app.get('application_id')]
+
+    demographics_lookup = {}
+    if application_ids:
+        supabase = get_supabase_client()
+        demographics_lookup = batch_fetch_demographics(supabase, application_ids, batch_size=100)
+    else:
+        demographics_data = []
+
+    # Top bar: left for spacing, right for Refresh button
+    _, top_right = st.columns([8, 1])
+    with top_right:
+        if st.button("Refresh", use_container_width=True):
+            st.rerun()
+
+    # --- Filter Controls ---
     with st.container(key="admin-filters"):
-        col1, col2, col3, col4 = st.columns([2, 2, 2, 1])
-        
+        col1, col2, col3, col4 = st.columns([2, 2, 2, 2])
         with col1:
             status_filter = st.selectbox(
                 "Filter by Status",
                 options=["All", "PENDING", "APPROVED", "REJECTED"],
                 index=1
             )
-        
         with col2:
             search_term = st.text_input("Search", placeholder="Name, email, or country...")
-        
         with col3:
             sort_by = st.selectbox(
                 "Sort by",
                 options=["Applied Date (Newest)", "Applied Date (Oldest)", "Name A-Z", "Name Z-A"]
             )
-        
         with col4:
-            if st.button("Refresh", use_container_width=True):
-                st.rerun()
+            all_demographics = sorted({d for v in demographics_lookup.values() for d in v})
+            selected_demographics = st.multiselect(
+                "Filter by Demographic Group(s)",
+                options=all_demographics
+            )
 
-    # Apply filters
-    filtered_apps = filter_applications(applications, status_filter, search_term, sort_by)
-    
-    # Statistics Dashboard
+    # --- Apply Filters ---
+    filtered_apps = filter_applications(
+        applications, status_filter, search_term, sort_by, demographics_lookup, selected_demographics
+    )
+
+    # --- Statistics Dashboard ---
     with st.container(key="admin-metrics"):
         display_application_statistics(filtered_apps, applications)
-    
-    # Applications CRUD Table
+
+    # --- Applications CRUD Table ---
     with st.container(key="admin-table"):
         st.header("Applications Table")
-        display_applications_table(filtered_apps, admin_id)
+        display_applications_table(filtered_apps, admin_id, demographics_lookup)
 
-    
 
-def filter_applications(applications, status_filter, search_term, sort_by):
+def filter_applications(applications, status_filter, search_term, sort_by, demographics_lookup, selected_demographics):
     """Filter and sort applications based on criteria"""
     filtered = applications.copy()
-    
+
     # Status filter
     if status_filter != "All":
         filtered = [app for app in filtered if app['status'] == status_filter]
-    
+
     # Search filter
     if search_term:
         search_lower = search_term.lower()
         filtered = [
-            app for app in filtered 
+            app for app in filtered
             if (search_lower in f"{app['first_name']} {app['last_name']}".lower() or
                 search_lower in app['email'].lower() or
                 search_lower in app['country'].lower())
         ]
-    
+
+    # Demographics filter (exact match)
+    if selected_demographics:
+        filtered = [
+            app for app in filtered
+            if set(demographics_lookup.get(app['application_id'], [])) == set(selected_demographics)
+        ]
+
     # Sorting
     if sort_by == "Applied Date (Newest)":
         filtered.sort(key=lambda x: x['applied_at'], reverse=True)
@@ -94,7 +118,7 @@ def filter_applications(applications, status_filter, search_term, sort_by):
         filtered.sort(key=lambda x: f"{x['first_name']} {x['last_name']}")
     elif sort_by == "Name Z-A":
         filtered.sort(key=lambda x: f"{x['first_name']} {x['last_name']}", reverse=True)
-    
+
     return filtered
 
 
@@ -164,16 +188,17 @@ def display_application_statistics(filtered_apps, all_apps):
             st.plotly_chart(fig_country, use_container_width=True)
 
 
-def display_applications_table(applications, admin_id):
+def display_applications_table(applications, admin_id, demographics_lookup):
     """Display applications in an interactive table with CRUD operations"""
     if not applications:
         st.info("No applications match your criteria.")
         return
-    
+
     # Create DataFrame for display
     table_data = []
     for app in applications:
         applied_date = datetime.fromisoformat(app['applied_at'].replace('Z', '+00:00'))
+        demographics = demographics_lookup.get(app['application_id'], [])
         table_data.append({
             'ID': app['application_id'][:8] + '...',
             'Name': f"{app['first_name']} {app['last_name']}",
@@ -182,19 +207,20 @@ def display_applications_table(applications, admin_id):
             'Education': app['education_status'],
             'Programming': app['programming_experience'],
             'Data Science': app['data_science_experience'],
+            'Demographics': ", ".join(demographics) if demographics else "N/A",
             'Status': app['status'],
             'Applied': applied_date.strftime('%Y-%m-%d'),
             'Full ID': app['application_id']  # Hidden column for operations
         })
-    
+
     df = pd.DataFrame(table_data)
-    
+
     # Display table with selection
     st.write(f"Showing {len(applications)} applications")
-    
+
     # Use columns for table and actions
     table_col, actions_col = st.columns([3, 1])
-    
+
     with table_col:
         # Display table (without the Full ID column)
         display_df = df.drop(columns=['Full ID'])
@@ -204,48 +230,48 @@ def display_applications_table(applications, admin_id):
             hide_index=True,
             height=400
         )
-    
+
     with actions_col:
         st.subheader("Actions")
-        
+
         # Application selection
         selected_name = st.selectbox(
             "Select Application",
             options=["None"] + [row['Name'] for _, row in df.iterrows()],
             key="selected_application"
         )
-        
+
         if selected_name != "None":
             # Find selected application
             selected_row = df[df['Name'] == selected_name].iloc[0]
             selected_id = selected_row['Full ID']
-            
+
             # Display selected application info
             st.write("**Selected:**")
             st.write(f"Name: {selected_row['Name']}")
             st.write(f"Email: {selected_row['Email']}")
             st.write(f"Status: {selected_row['Status']}")
-            
+
             # Action buttons
             if st.button("View Details", use_container_width=True):
                 st.session_state[f"show_details_{selected_id}"] = True
                 st.rerun()
-            
+
             if selected_row['Status'] == 'PENDING':
                 if st.button("Quick Approve", use_container_width=True, type="primary"):
                     if approve_application(selected_id, admin_id, "Quick approval via table"):
                         st.success("Application approved!")
                         st.rerun()
-                
+
                 if st.button("Quick Reject", use_container_width=True):
                     if reject_application(selected_id, admin_id, "Quick rejection via table"):
                         st.success("Application rejected!")
                         st.rerun()
-        
+
         # Bulk actions
         st.divider()
         st.subheader("Bulk Actions")
-        
+
         if st.button("Export CSV", use_container_width=True):
             csv = df.drop(columns=['Full ID']).to_csv(index=False)
             st.download_button(
@@ -255,13 +281,13 @@ def display_applications_table(applications, admin_id):
                 mime="text/csv",
                 use_container_width=True
             )
-    
+
     # Show application details if requested
     for app in applications:
         if st.session_state.get(f"show_details_{app['application_id']}", False):
             with st.expander(f"Application Details - {app['first_name']} {app['last_name']}", expanded=True):
                 display_application_details(app['application_id'], admin_id, app['status'])
-                
+
                 if st.button("Close Details", key=f"close_{app['application_id']}"):
                     st.session_state[f"show_details_{app['application_id']}"] = False
                     st.rerun()

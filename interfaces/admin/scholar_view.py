@@ -10,7 +10,8 @@ from utils.queries import (
     get_scholar_certifications_count,
     get_scholar_employment_status,
     get_scholar_certifications,
-    get_scholar_jobs
+    get_scholar_jobs,
+    batch_fetch_demographics
 )
 from utils.db import get_supabase_client
 
@@ -31,31 +32,48 @@ def admin_scholars_page():
         st.write("Scholars will appear here when applications are approved and MoA documents are processed.")
         return
     
+    # After fetching scholars
+    application_ids = [
+        s['applications']['application_id']
+        for s in scholars
+        if s.get('applications') and s['applications'].get('application_id')
+    ]
+    supabase = get_supabase_client()
+    demographics_lookup = batch_fetch_demographics(supabase, application_ids, batch_size=100)
+
+    # Top bar: left for spacing, right for Refresh button
+    _, top_right = st.columns([8, 1])
+    with top_right:
+        if st.button("Refresh", use_container_width=True):
+            st.rerun()
+
     # Filter Controls
     with st.container(key="admin-filters"):
-        col1, col2, col3, col4 = st.columns([2, 2, 2, 1])
-        
+        col1, col2, col3, col4 = st.columns([2, 2, 2, 2])
         with col1:
             status_filter = st.selectbox(
                 "Filter by Status",
                 options=["All", "Active", "Inactive"]
             )
-        
+
         with col2:
             search_term = st.text_input("Search", placeholder="Name, email, or Scholar ID...")
-        
+
         with col3:
             sort_by = st.selectbox(
                 "Sort by",
                 options=["Newest First", "Oldest First", "Name A-Z", "Name Z-A", "Scholar ID"]
             )
-        
+
         with col4:
-            if st.button("Refresh", use_container_width=True):
-                st.rerun()
+            all_demographics = sorted({d for v in demographics_lookup.values() for d in v})
+            selected_demographics = st.multiselect(
+                "Filter by Demographic Group(s)",
+                options=all_demographics
+            )
     
     # Apply filters
-    filtered_scholars = filter_scholars(scholars, status_filter, search_term, sort_by)
+    filtered_scholars = filter_scholars(scholars, status_filter, search_term, sort_by, demographics_lookup, selected_demographics)
     
     # Statistics Dashboard
     with st.container(key="admin-metrics"):
@@ -64,10 +82,10 @@ def admin_scholars_page():
     # Scholars CRUD Table
     with st.container(key="admin-table"):
         st.header("Scholars Directory Table")
-        display_scholars_table(filtered_scholars)
+        display_scholars_table(filtered_scholars, demographics_lookup)
 
 
-def filter_scholars(scholars, status_filter, search_term, sort_by):
+def filter_scholars(scholars, status_filter, search_term, sort_by, demographics_lookup, selected_demographics):
     """Filter and sort scholars based on criteria"""
     filtered = scholars.copy()
     
@@ -85,6 +103,13 @@ def filter_scholars(scholars, status_filter, search_term, sort_by):
             if (search_lower in f"{s['applications']['first_name']} {s['applications']['last_name']}".lower() or
                 search_lower in s['applications']['email'].lower() or
                 search_lower in s['scholar_id'].lower())
+        ]
+    
+    # Demographics filter
+    if selected_demographics:
+        filtered = [
+            s for s in filtered
+            if set(demographics_lookup.get(s['applications']['application_id'], [])) == set(selected_demographics)
         ]
     
     # Sorting
@@ -183,7 +208,7 @@ def display_scholar_statistics(filtered_scholars, all_scholars):
             st.plotly_chart(fig_country, use_container_width=True)
 
 
-def display_scholars_table(scholars):
+def display_scholars_table(scholars, demographics_lookup):
     """Display scholars in an interactive table with CRUD operations"""
     if not scholars:
         st.info("No scholars match your criteria.")
@@ -199,6 +224,9 @@ def display_scholars_table(scholars):
         certifications_count = get_scholar_certifications_count(scholar['scholar_id'])
         employment_status = get_scholar_employment_status(scholar['scholar_id'])
         
+        # Demographics
+        demographics = demographics_lookup.get(scholar['applications']['application_id'], [])
+        
         table_data.append({
             'Scholar ID': scholar['scholar_id'],
             'Name': f"{scholar['applications']['first_name']} {scholar['applications']['last_name']}",
@@ -209,6 +237,7 @@ def display_scholars_table(scholars):
             'Certifications': certifications_count,
             'Employment': employment_status,
             'Joined': created_date.strftime('%Y-%m-%d'),
+            'Demographics': ", ".join(demographics) if demographics else "N/A",
             'Full Data': scholar  # Hidden column for operations
         })
     
@@ -317,6 +346,12 @@ def display_scholars_table(scholars):
                 if st.button("Close Certifications", key=f"close_certs_{scholar['scholar_id']}"):
                     st.session_state[f"show_certs_{scholar['scholar_id']}"] = False
                     st.rerun()
+
+    missing_app_id_count = sum(
+        1 for s in scholars if not (s.get('applications') and s['applications'].get('application_id'))
+    )
+    if missing_app_id_count:
+        st.warning(f"{missing_app_id_count} scholars have missing application IDs and are not shown in the directory.")
 
 
 def display_scholar_profile(scholar):
