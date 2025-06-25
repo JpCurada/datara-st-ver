@@ -62,7 +62,8 @@ def admin_scholars_page():
         with col3:
             sort_by = st.selectbox(
                 "Sort by",
-                options=["Newest First", "Oldest First", "Name A-Z", "Name Z-A", "Scholar ID"]
+                options=["Newest First", "Oldest First", "Name A-Z", "Name Z-A", "Scholar ID"],
+                index=1
             )
 
         with col4:
@@ -213,20 +214,33 @@ def display_scholars_table(scholars, demographics_lookup):
     if not scholars:
         st.info("No scholars match your criteria.")
         return
-    
+
+    # --- Batch fetch certifications count ---
+    scholar_ids = [s['scholar_id'] for s in scholars]
+    supabase = get_supabase_client()
+
+    # Batch fetch certifications
+    certs = supabase.table("certifications").select("scholar_id").in_("scholar_id", scholar_ids).execute().data
+    certs_count_lookup = {}
+    for row in certs:
+        certs_count_lookup[row['scholar_id']] = certs_count_lookup.get(row['scholar_id'], 0) + 1
+
+    # Batch fetch employment (current jobs)
+    jobs = supabase.table("jobs").select("scholar_id").eq("is_published", True).in_("scholar_id", scholar_ids).execute().data
+    employment_lookup = {row['scholar_id']: "Employed" for row in jobs}
+
     # Create DataFrame for display
     table_data = []
     for scholar in scholars:
         created_date = datetime.fromisoformat(scholar['created_at'].replace('Z', '+00:00'))
         days_active = (datetime.now().replace(tzinfo=created_date.tzinfo) - created_date).days
-        
-        # Get additional data
-        certifications_count = get_scholar_certifications_count(scholar['scholar_id'])
-        employment_status = get_scholar_employment_status(scholar['scholar_id'])
-        
+
+        certifications_count = certs_count_lookup.get(scholar['scholar_id'], 0)
+        employment_status = employment_lookup.get(scholar['scholar_id'], "Seeking")
+
         # Demographics
         demographics = demographics_lookup.get(scholar['applications']['application_id'], [])
-        
+
         table_data.append({
             'Scholar ID': scholar['scholar_id'],
             'Name': f"{scholar['applications']['first_name']} {scholar['applications']['last_name']}",
@@ -240,67 +254,59 @@ def display_scholars_table(scholars, demographics_lookup):
             'Demographics': ", ".join(demographics) if demographics else "N/A",
             'Full Data': scholar  # Hidden column for operations
         })
-    
+
     df = pd.DataFrame(table_data)
-    
+
     # Display table with selection
     st.write(f"Showing {len(scholars)} scholars")
-    
-    # Use columns for table and actions
+
     table_col, actions_col = st.columns([3, 1])
-    
+
     with table_col:
-        # Display table (without the Full Data column)
         display_df = df.drop(columns=['Full Data'])
-        
-        # Color code the status column
+
         def highlight_status(val):
             if val == 'Active':
                 return 'background-color: #d4edda'
             elif val == 'Inactive':
                 return 'background-color: #f8d7da'
             return ''
-        
+
         styled_df = display_df.style.applymap(highlight_status, subset=['Status'])
-        
+
         st.dataframe(
             styled_df,
             use_container_width=True,
             hide_index=True,
             height=400
         )
-    
+
     with actions_col:
         st.subheader("Actions")
-        
-        # Scholar selection
         selected_name = st.selectbox(
             "Select Scholar",
             options=["None"] + [row['Name'] for _, row in df.iterrows()],
             key="selected_scholar"
         )
-        
+
         if selected_name != "None":
-            # Find selected scholar
             selected_row = df[df['Name'] == selected_name].iloc[0]
             selected_scholar = selected_row['Full Data']
-            
-            # Display selected scholar info
+
             st.write("**Selected:**")
             st.write(f"Name: {selected_row['Name']}")
             st.write(f"ID: {selected_row['Scholar ID']}")
             st.write(f"Status: {selected_row['Status']}")
             st.write(f"Certifications: {selected_row['Certifications']}")
-            
-            # Action buttons
+
             if st.button("View Profile", use_container_width=True):
                 st.session_state[f"show_scholar_profile_{selected_scholar['scholar_id']}"] = True
                 st.rerun()
-            
+
             if st.button("View Certifications", use_container_width=True):
                 st.session_state[f"show_certs_{selected_scholar['scholar_id']}"] = True
                 st.rerun()
-            
+
             if selected_scholar['is_active']:
                 if st.button("Deactivate", use_container_width=True):
                     if toggle_scholar_status(selected_scholar['scholar_id'], False):
@@ -311,11 +317,10 @@ def display_scholars_table(scholars, demographics_lookup):
                     if toggle_scholar_status(selected_scholar['scholar_id'], True):
                         st.success("Scholar reactivated")
                         st.rerun()
-        
-        # Bulk actions
+
         st.divider()
         st.subheader("Bulk Actions")
-        
+
         if st.button("Export CSV", use_container_width=True):
             csv = df.drop(columns=['Full Data']).to_csv(index=False)
             st.download_button(
@@ -325,24 +330,22 @@ def display_scholars_table(scholars, demographics_lookup):
                 mime="text/csv",
                 use_container_width=True
             )
-        
+
         if st.button("Send Bulk Email", use_container_width=True):
             st.info("Bulk email feature coming soon")
-    
+
     # Show scholar profiles if requested
     for scholar in scholars:
         if st.session_state.get(f"show_scholar_profile_{scholar['scholar_id']}", False):
             with st.expander(f"Scholar Profile - {scholar['applications']['first_name']} {scholar['applications']['last_name']}", expanded=True):
                 display_scholar_profile(scholar)
-                
                 if st.button("Close Profile", key=f"close_profile_{scholar['scholar_id']}"):
                     st.session_state[f"show_scholar_profile_{scholar['scholar_id']}"] = False
                     st.rerun()
-        
+
         if st.session_state.get(f"show_certs_{scholar['scholar_id']}", False):
             with st.expander(f"Certifications - {scholar['applications']['first_name']} {scholar['applications']['last_name']}", expanded=True):
                 display_scholar_certifications(scholar['scholar_id'])
-                
                 if st.button("Close Certifications", key=f"close_certs_{scholar['scholar_id']}"):
                     st.session_state[f"show_certs_{scholar['scholar_id']}"] = False
                     st.rerun()
